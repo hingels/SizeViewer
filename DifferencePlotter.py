@@ -7,6 +7,9 @@ Created on Wed Sep 27 11:52:38 2023
 """
 
 import os
+import pandas as pd
+import numpy as np
+
 import matplotlib as mpl
 resolution = 200
 mpl.rcParams['figure.dpi'] = resolution
@@ -15,9 +18,8 @@ mpl.rcParams['axes.spines.left'] = False
 mpl.rcParams['axes.spines.right'] = False
 width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
-import pandas as pd
-import numpy as np
 
+x_lim = 250
 datafolder = "/Users/henryingels/Desktop/Complete data copy/"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
@@ -50,11 +52,9 @@ colors = cm.plasma(np.linspace(0, 1, num_of_plots))
 fig, axs = plt.subplots(num_of_plots, 1)
 fig.subplots_adjust(hspace=-0.05*height)
 
-overall_max = 0
-overall_min = 0
 
-x_lim = 250
-
+final_i = num_of_plots - 1
+overall_min, overall_max = 0, 0
 previous_sizes = None
 for i, ax in enumerate(axs):
     data = pd.read_csv(filepaths[i], sep = '\t ', engine = 'python').iloc[:250, :]
@@ -80,7 +80,7 @@ for i, ax in enumerate(axs):
     name = name.removesuffix(suffix)
     plt.text(x_lim*1.05, 0, name, fontsize=12, transform = ax.transData)
     
-    if i == (num_of_plots - 1):
+    if i == final_i:
         ax.yaxis.get_offset_text().set_x(-0.1)
         plt.xlabel("Diameter (nm)")
         plt.ticklabel_format(style = 'sci', axis = 'y', scilimits = (0, 0))
@@ -94,20 +94,20 @@ for i, ax in enumerate(axs):
 for i, ax in enumerate(axs):
     plt.sca(ax)
     plt.ylim(overall_min, overall_max)
-    ax.xaxis.set_tick_params(width = 2)
-    ax.yaxis.set_tick_params(width = 2)
-    if (i+1) != num_of_plots:
-        ax.spines['bottom'].set_position(('data', 0))
-    else:
+    if i == final_i:
         plt.axhline(0, color = 'black')
+    else:
+        ax.spines['bottom'].set_position(('data', 0))
 
-#Using the ax from the final (bottom) plot:
+final_ax = ax   # Using the ax from the final (bottom) plot:
+final_ax.xaxis.set_tick_params(width = 2)
+final_ax.yaxis.set_tick_params(width = 2)
 tick_values, tick_labels = plt.xticks()
 for tick_value in tick_values:
-    disp_coords = ax.transData.transform([tick_value, overall_min])
-    converted_x, converted_y = fig.transFigure.inverted().transform(disp_coords)
+    display_coords = final_ax.transData.transform([tick_value, overall_min])
+    figure_x, figure_y = fig.transFigure.inverted().transform(display_coords)
     
-    line = plt.Line2D([converted_x, converted_x], [converted_y, 0.9], lw = 2, color='black', alpha=0.1, transform = fig.transFigure)
+    line = plt.Line2D([figure_x, figure_x], [figure_y, 0.9], lw = 2, color='black', alpha=0.1, transform = fig.transFigure)
     fig.add_artist(line)
     line.set_clip_on(False)
     
