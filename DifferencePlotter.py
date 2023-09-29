@@ -10,6 +10,7 @@ import os
 import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
+from collections import OrderedDict
 
 import matplotlib as mpl
 resolution = 200
@@ -95,12 +96,6 @@ for i, ax in enumerate(axs):
     
     previous_sizes = sizes
     
-    
-    with open(xml_filepaths[i]) as xml_file:
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
-        for setting in root.find('RecordingSettings'):
-            print(setting)
 
 origins = []
 for i, ax in enumerate(axs):
@@ -147,6 +142,44 @@ cell_height = axis_positions[0] - axis_positions[1]
 table_top = axis_positions[0] + 0.5*cell_height
 table_bottom = axis_positions[-1] - 0.5*cell_height
 
+
+
+class Setting():
+    def __init__(self, name, units, column = None, value = None):
+        self.name = name
+        self.units = units
+        self.column = column
+        self.value = value
+class Settings():
+    def __init__(self, settings_dict):
+        self.tags = settings_dict
+        # columns = dict()
+        # for setting in settings_dict.values():
+        #     column = setting.column
+        #     if column not in columns:
+        #         columns[column] = []
+        #     columns[column].append(setting)
+        # self.columns = columns
+        columns = []
+        for setting in settings_dict.values():
+            column = setting.column - 1     # -1 to account for the title column
+            if column > (len(columns) - 1):
+                columns.append([])
+            columns[column].append(setting)
+        self.columns = columns
+    # def __iter__(self):
+    #     yield from self.columns.items()
+    def by_tag(self, tag):
+        return self.tags[tag]
+    # def by_column(self, column):
+    #     return self.columns[column]
+
+# settings = OrderedDict({
+#     'RedLaserPower': Setting('R', 'mW', column = 1),
+#     'GreenLaserPower': Setting('G', 'mW', column = 1),
+#     'BlueLaserPower': Setting('B', 'mW', column = 1)})
+
+
 def generate_rows():
     for i, ax in enumerate(axs):
         row = []
@@ -156,9 +189,30 @@ def generate_rows():
         name = name.removesuffix(suffix)
         row.append(name)
         
-        row.append('Hello')
+        settings = Settings(OrderedDict({
+            'RedLaserPower': Setting('R', 'mW', column = 1),
+            'GreenLaserPower': Setting('G', 'mW', column = 1),
+            'BlueLaserPower': Setting('B', 'mW', column = 1)}))
+        with open(xml_filepaths[i]) as xml_file:
+            tree = ET.parse(xml_file)
+            root = tree.getroot()
+            for entry in root.find('RecordingSettings'):
+                tag = entry.tag
+                if tag in settings.tags:
+                    # row.append(f"{setting.tag}: {setting.text}")
+                    setting = settings.by_tag(tag)
+                    setting.value = entry.text
+                    
+        # for column_number, column in settings:
+        for column in settings.columns:
+            content = '\n'.join(f"{setting.name}: {setting.value} ({setting.units})" for setting in column)
+            # row.append(f"{setting.name}: {setting.value} ({setting.units})")
+            row.append(content)
         
-        row.append('world')
+        
+        # row.append('Hello')
+        
+        # row.append('world')
         
         yield row
 
@@ -167,8 +221,10 @@ margin = 0
 display_coords = final_ax.transData.transform([0, overall_min])
 edge = right_edge_figure + margin
 
-column_widths = [0.6, 0.2, 0.2]
-assert sum(column_widths) == 1
+# column_widths = [0.7, 0.1, 0.1, 0.1]
+# column_widths = [0.1, 0.3, 0.3, 0.3]
+column_widths = [0.5, 0.5]
+assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
 
 table = plt.table(
     tuple(generate_rows()),
