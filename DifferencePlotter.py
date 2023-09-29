@@ -7,6 +7,7 @@ Created on Wed Sep 27 11:52:38 2023
 """
 
 import os
+import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
 
@@ -35,11 +36,16 @@ names = [
     "230729 KW+EW re-measure 4"
 ]
 
-all_files = {
+all_dat_files = {
     filename.removeprefix(prefix).removesuffix(suffix): os.path.join(path, filename)
     for (path, subdirs, files) in os.walk(datafolder) for filename in files
     if filename.startswith(prefix) and filename.endswith(suffix)}
-filepaths = [all_files[name] for name in names]
+all_xml_files = {
+    '_'.join(split_name[:-2]): os.path.join(path, filename)
+    for (path, subdirs, files) in os.walk(datafolder) for filename in files
+    if filename.endswith('.xml') and len(split_name := filename.split('_')) > 2}
+filepaths = [all_dat_files[name] for name in names]
+xml_filepaths = [all_xml_files[name] for name in names]
 
 
 num_of_plots = len(filepaths)
@@ -51,6 +57,7 @@ colors = cm.plasma(np.linspace(0, 1, num_of_plots))
 
 fig, axs = plt.subplots(num_of_plots, 1)
 fig.subplots_adjust(hspace=-0.05*height)
+transFigure = fig.transFigure
 
 
 final_i = num_of_plots - 1
@@ -90,6 +97,13 @@ for i, ax in enumerate(axs):
     plt.xticks([])
     
     previous_sizes = sizes
+    
+    
+    with open(xml_filepaths[i]) as xml_file:
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+        for setting in root.find('RecordingSettings'):
+            print(setting)
 
 for i, ax in enumerate(axs):
     plt.sca(ax)
@@ -103,15 +117,33 @@ final_ax = ax   # Using the ax from the final (bottom) plot:
 final_ax.xaxis.set_tick_params(width = 2)
 final_ax.yaxis.set_tick_params(width = 2)
 tick_values, tick_labels = plt.xticks()
-for tick_value in tick_values:
+final_i = len(tick_values) - 1
+
+grid_proportion_of_figure = 0.9
+
+right_edge = None
+right_edge_figure = None
+
+for i, tick_value in enumerate(tick_values):
     display_coords = final_ax.transData.transform([tick_value, overall_min])
-    figure_x, figure_y = fig.transFigure.inverted().transform(display_coords)
+    figure_x, figure_y = transFigure.inverted().transform(display_coords)
     
-    line = plt.Line2D([figure_x, figure_x], [figure_y, 0.9], lw = 2, color='black', alpha=0.1, transform = fig.transFigure)
+    line = plt.Line2D([figure_x, figure_x], [figure_y, grid_proportion_of_figure], lw = 2, color='black', alpha=0.1, transform = transFigure)
     fig.add_artist(line)
     line.set_clip_on(False)
     
+    if i == final_i:
+        right_edge, _ = display_coords
+        right_edge_figure = figure_x
+    
 
-plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = fig.transFigure, rotation = 'vertical', verticalalignment = 'center')
+plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
 
-plt.text(0, 0.95, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = fig.transFigure, verticalalignment = 'center')
+plt.text(0, 0.95, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+
+table_width = 1
+margin = 0.5
+display_coords = final_ax.transData.transform([0, overall_min])
+_, figure_y = transFigure.inverted().transform(display_coords)
+edge = right_edge_figure + margin
+plt.table([['Hello', 'world'], ['This is', 'pretty neat']], bbox = mpl.transforms.Bbox([[edge, figure_y], [edge + table_width, grid_proportion_of_figure]]), transform = transFigure)
