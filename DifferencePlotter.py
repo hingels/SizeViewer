@@ -105,6 +105,7 @@ for i, ax in enumerate(axs):
         for setting in root.find('RecordingSettings'):
             print(setting)
 
+origins = []
 for i, ax in enumerate(axs):
     plt.sca(ax)
     plt.ylim(overall_min, overall_max)
@@ -112,6 +113,8 @@ for i, ax in enumerate(axs):
         plt.axhline(0, color = 'black')
     else:
         ax.spines['bottom'].set_position(('data', 0))
+    origin_transDisplay = ax.transData.transform([0, 0])
+    origins.append(transFigure.inverted().transform(origin_transDisplay))
 
 final_ax = ax   # Using the ax from the final (bottom) plot:
 final_ax.xaxis.set_tick_params(width = 2)
@@ -141,9 +144,30 @@ plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, tran
 
 plt.text(0, 0.95, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
+
+for pos in origins:
+    plt.text(*pos, 'O!', transform = transFigure)
+
+# breaks = [(origins[i][1] + origins[i+1][1])/2 for i in range(len(origins) - 1)]
+
+# cell_height = breaks[0] - breaks[1]
+# table_top = breaks[0] + cell_height
+# table_bottom = breaks[-1] - cell_height
+# for pos in breaks:
+#     plt.text(0, pos, '---', transform = transFigure)
+axis_positions = [origin[1] for origin in origins]
+cell_height = axis_positions[0] - axis_positions[1]
+table_top = axis_positions[0] + 0.5*cell_height
+table_bottom = axis_positions[-1] - 0.5*cell_height
+# print(table_top, table_bottom)
+
 table_width = 1
 margin = 0.5
 display_coords = final_ax.transData.transform([0, overall_min])
 _, figure_y = transFigure.inverted().transform(display_coords)
 edge = right_edge_figure + margin
-plt.table([['Hello', 'world'], ['This is', 'pretty neat']], bbox = mpl.transforms.Bbox([[edge, figure_y], [edge + table_width, grid_proportion_of_figure]]), transform = transFigure)
+# table = plt.table([['Hello', 'world'], ['This is', 'pretty neat']], bbox = mpl.transforms.Bbox([[edge, figure_y], [edge + table_width, grid_proportion_of_figure]]), transform = transFigure)
+# table = plt.table([[], []], bbox = mpl.transforms.Bbox([[edge, figure_y], [edge + table_width, grid_proportion_of_figure]]), transform = transFigure)
+# for i, ax in enumerate(axs):
+#     table.add_cell(i, 0, 0.1, 0.1, text = 'hi')
+table = plt.table([['', '']]*num_of_plots, bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]), transform = transFigure)
