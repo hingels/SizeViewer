@@ -54,6 +54,8 @@ height = min(np.floor(65536/resolution), height)
 mpl.rcParams["figure.figsize"] = [width, height]
 colors = cm.plasma(np.linspace(0, 1, num_of_plots))
 
+grid_color = '0.8'
+
 
 fig, axs = plt.subplots(num_of_plots, 1)
 fig.subplots_adjust(hspace=-0.05*height)
@@ -81,12 +83,7 @@ for i, ax in enumerate(axs):
     
     plt.xlim(0, x_lim)
     ax.patch.set_alpha(0)
-    
-    name = os.path.basename(filepaths[i])
-    name = name.removeprefix(prefix)
-    name = name.removesuffix(suffix)
-    plt.text(x_lim*1.05, 0, name, fontsize=12, transform = ax.transData)
-    
+        
     if i == final_i:
         ax.yaxis.get_offset_text().set_x(-0.1)
         plt.xlabel("Diameter (nm)")
@@ -131,7 +128,7 @@ for i, tick_value in enumerate(tick_values):
     display_coords = final_ax.transData.transform([tick_value, overall_min])
     figure_x, figure_y = transFigure.inverted().transform(display_coords)
     
-    line = plt.Line2D([figure_x, figure_x], [figure_y, grid_proportion_of_figure], lw = 2, color='black', alpha=0.1, transform = transFigure)
+    line = plt.Line2D([figure_x, figure_x], [figure_y, grid_proportion_of_figure], lw = 1, color = grid_color, transform = transFigure, zorder = 0)
     fig.add_artist(line)
     line.set_clip_on(False)
     
@@ -145,29 +142,40 @@ plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, tran
 plt.text(0, 0.95, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 
-for pos in origins:
-    plt.text(*pos, 'O!', transform = transFigure)
-
-# breaks = [(origins[i][1] + origins[i+1][1])/2 for i in range(len(origins) - 1)]
-
-# cell_height = breaks[0] - breaks[1]
-# table_top = breaks[0] + cell_height
-# table_bottom = breaks[-1] - cell_height
-# for pos in breaks:
-#     plt.text(0, pos, '---', transform = transFigure)
 axis_positions = [origin[1] for origin in origins]
 cell_height = axis_positions[0] - axis_positions[1]
 table_top = axis_positions[0] + 0.5*cell_height
 table_bottom = axis_positions[-1] - 0.5*cell_height
-# print(table_top, table_bottom)
+
+def generate_rows():
+    for i, ax in enumerate(axs):
+        row = []
+        
+        name = os.path.basename(filepaths[i])
+        name = name.removeprefix(prefix)
+        name = name.removesuffix(suffix)
+        row.append(name)
+        
+        row.append('Hello')
+        
+        row.append('world')
+        
+        yield row
 
 table_width = 1
-margin = 0.5
+margin = 0
 display_coords = final_ax.transData.transform([0, overall_min])
-_, figure_y = transFigure.inverted().transform(display_coords)
 edge = right_edge_figure + margin
-# table = plt.table([['Hello', 'world'], ['This is', 'pretty neat']], bbox = mpl.transforms.Bbox([[edge, figure_y], [edge + table_width, grid_proportion_of_figure]]), transform = transFigure)
-# table = plt.table([[], []], bbox = mpl.transforms.Bbox([[edge, figure_y], [edge + table_width, grid_proportion_of_figure]]), transform = transFigure)
-# for i, ax in enumerate(axs):
-#     table.add_cell(i, 0, 0.1, 0.1, text = 'hi')
-table = plt.table([['', '']]*num_of_plots, bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]), transform = transFigure)
+
+column_widths = [0.6, 0.2, 0.2]
+assert sum(column_widths) == 1
+
+table = plt.table(
+    tuple(generate_rows()),
+    bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]),
+    transform = transFigure,
+    cellLoc = 'left', colWidths = column_widths)
+table.auto_set_font_size(False)
+table.set_fontsize(12)
+for cell in table.get_celld().values():
+    cell.set(edgecolor = grid_color)
