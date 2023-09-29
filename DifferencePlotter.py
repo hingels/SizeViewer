@@ -145,21 +145,15 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
 class Setting():
-    def __init__(self, name, units, column = None, value = None):
+    def __init__(self, name, units, column = None, value = None, show_unit = False):
         self.name = name
         self.units = units
         self.column = column
         self.value = value
+        self.show_unit = False
 class Settings():
     def __init__(self, settings_dict):
         self.tags = settings_dict
-        # columns = dict()
-        # for setting in settings_dict.values():
-        #     column = setting.column
-        #     if column not in columns:
-        #         columns[column] = []
-        #     columns[column].append(setting)
-        # self.columns = columns
         columns = []
         for setting in settings_dict.values():
             column = setting.column - 1     # -1 to account for the title column
@@ -167,17 +161,8 @@ class Settings():
                 columns.append([])
             columns[column].append(setting)
         self.columns = columns
-    # def __iter__(self):
-    #     yield from self.columns.items()
     def by_tag(self, tag):
         return self.tags[tag]
-    # def by_column(self, column):
-    #     return self.columns[column]
-
-# settings = OrderedDict({
-#     'RedLaserPower': Setting('R', 'mW', column = 1),
-#     'GreenLaserPower': Setting('G', 'mW', column = 1),
-#     'BlueLaserPower': Setting('B', 'mW', column = 1)})
 
 
 def generate_rows():
@@ -199,20 +184,15 @@ def generate_rows():
             for entry in root.find('RecordingSettings'):
                 tag = entry.tag
                 if tag in settings.tags:
-                    # row.append(f"{setting.tag}: {setting.text}")
                     setting = settings.by_tag(tag)
                     setting.value = entry.text
                     
-        # for column_number, column in settings:
         for column in settings.columns:
-            content = '\n'.join(f"{setting.name}: {setting.value} ({setting.units})" for setting in column)
-            # row.append(f"{setting.name}: {setting.value} ({setting.units})")
+            if setting.show_unit:
+                content = '\n'.join(f"{setting.name}: {setting.value} ({setting.units})" for setting in column)
+            else:
+                content = '\n'.join(f"{setting.name}: {setting.value}" for setting in column)
             row.append(content)
-        
-        
-        # row.append('Hello')
-        
-        # row.append('world')
         
         yield row
 
@@ -221,8 +201,7 @@ margin = 0
 display_coords = final_ax.transData.transform([0, overall_min])
 edge = right_edge_figure + margin
 
-# column_widths = [0.7, 0.1, 0.1, 0.1]
-# column_widths = [0.1, 0.3, 0.3, 0.3]
+column_names = ["Sample", "Power\n(mW)"]
 column_widths = [0.5, 0.5]
 assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
 
@@ -233,5 +212,13 @@ table = plt.table(
     cellLoc = 'left', colWidths = column_widths)
 table.auto_set_font_size(False)
 table.set_fontsize(12)
+
+
+for i, name in enumerate(column_names):
+    new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.05, text = name, loc = 'left')
+    new_cell.set_text_props(fontweight = 'bold')
+
+
 for cell in table.get_celld().values():
     cell.set(edgecolor = grid_color)
+
