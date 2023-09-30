@@ -21,6 +21,17 @@ mpl.rcParams['axes.spines.right'] = False
 width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
 
+
+terms = 10
+# datafilter = np.array([1/terms]*terms)
+x = np.linspace(0, terms, terms)
+std = 4     # In units of bins
+mu = terms/2
+gaussian = np.exp(-np.power((x - mu)/std, 2)/2)/(std * np.sqrt(2*np.pi))
+datafilter = gaussian / gaussian.sum()
+filter_description = f"Black lines indicate Gaussian smoothing with $\sigma = {std}$ bins and convolution kernel of size {terms} bins."
+
+
 x_lim = 250
 datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
 prefix = 'ConstantBinsTable_'
@@ -104,6 +115,9 @@ for i, ax in enumerate(axs):
     plt.sca(ax)
     plt.bar(bins, sizes, width = width, color = colors[i], alpha = 0.7, align = 'center')
     
+    filtered = np.convolve(sizes, datafilter, mode = 'same')
+    plt.plot(bins, filtered, '-', color = 'black', linewidth = 0.5)
+    
     overall_max = max(sizes.max(), overall_max)
     if previous_sizes is not None:
         size_differences = sizes - previous_sizes
@@ -164,6 +178,7 @@ for i, tick_value in enumerate(tick_values):
 plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
 
 plt.text(0, 0.95, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+plt.text(0, 0.93, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 
 axis_positions = [origin[1] for origin in origins]
