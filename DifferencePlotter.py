@@ -22,7 +22,8 @@ width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
 
 x_lim = 250
-datafolder = "/Users/henryingels/Desktop/Complete data copy/"
+# datafolder = "/Users/henryingels/Desktop/Complete data copy/"
+datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
 names = [
@@ -37,6 +38,40 @@ names = [
     "230729 KW+EW re-measure 4"
 ]
 
+
+class Sample():
+    def __init__(self, folder):
+        self.folder = folder
+        info = None
+        xml = None
+        dat = None
+        for (path, subdirs, files) in os.walk(folder):
+            for filename in files:
+                full_path = os.path.join(path, filename)
+                if filename == 'info.md':
+                    info = full_path
+                split_name = filename.split('_')
+                if filename.endswith('.xml') and len(split_name) > 2:
+                    xml = full_path
+                if filename.startswith(prefix) and filename.endswith(suffix):
+                    dat = full_path
+        self.info = info
+        self.xml = xml
+        self.dat = dat
+        if info is not None:
+            with open(info) as info_file:
+                for line in info_file.readlines():
+                    prop, value = line.split('=')
+                    setattr(self, prop, value.strip())
+        if hasattr(self, 'name') is False:
+            self.name = os.path.basename(folder).removeprefix(prefix).removesuffix(suffix)
+
+samples = [Sample(os.path.join(datafolder, folder)) for folder in os.listdir(datafolder)]
+for sample in samples:
+    if hasattr(sample, 'name'):
+        print(sample.name)
+# print(os.listdir(datafolder))
+
 all_dat_files = {
     filename.removeprefix(prefix).removesuffix(suffix): os.path.join(path, filename)
     for (path, subdirs, files) in os.walk(datafolder) for filename in files
@@ -45,8 +80,13 @@ all_xml_files = {
     '_'.join(split_name[:-2]): os.path.join(path, filename)
     for (path, subdirs, files) in os.walk(datafolder) for filename in files
     if filename.endswith('.xml') and len(split_name := filename.split('_')) > 2}
+# all_md_files = {
+#     os.path.basename(path): os.path.join(path, filename)
+#     for (path, subdirs, files) in os.walk(datafolder) for filename in files
+#     if filename == 'info.md'}
 filepaths = [all_dat_files[name] for name in names]
 xml_filepaths = [all_xml_files[name] for name in names]
+# md_filepaths = [all_md_files[name] for name in names]
 
 
 num_of_plots = len(filepaths)
@@ -145,11 +185,14 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
 class Setting():
-    def __init__(self, name, units, column = None, value = None, show_unit = False):
+    def __init__(self, name, units, column = None, value = None, show_unit = False, datatype = str):
         self.name = name
         self.units = units
         self.column = column
-        self.value = value
+        if value is None:
+            self.value = value
+        else:
+            self.value = datatype(value)
         self.show_unit = False
 class Settings():
     def __init__(self, settings_dict):
@@ -163,6 +206,8 @@ class Settings():
         self.columns = columns
     def by_tag(self, tag):
         return self.tags[tag]
+    def set_value(self, value):
+        self.value = self.datatype(value)
 
 
 def generate_rows():
@@ -175,9 +220,9 @@ def generate_rows():
         row.append(name)
         
         settings = Settings(OrderedDict({
-            'RedLaserPower': Setting('R', 'mW', column = 1),
-            'GreenLaserPower': Setting('G', 'mW', column = 1),
-            'BlueLaserPower': Setting('B', 'mW', column = 1)}))
+            'RedLaserPower': Setting('R', 'mW', column = 1, datatype = int),
+            'GreenLaserPower': Setting('G', 'mW', column = 1, datatype = int),
+            'BlueLaserPower': Setting('B', 'mW', column = 1, datatype = int)}))
         with open(xml_filepaths[i]) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
@@ -202,6 +247,7 @@ display_coords = final_ax.transData.transform([0, overall_min])
 edge = right_edge_figure + margin
 
 column_names = ["Sample", "Power\n(mW)"]
+# column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
 column_widths = [0.5, 0.5]
 assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
 
