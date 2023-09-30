@@ -10,6 +10,7 @@ import os
 import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
+from scipy.signal import argrelextrema, find_peaks_cwt, savgol_filter
 from collections import OrderedDict
 
 import matplotlib as mpl
@@ -22,14 +23,13 @@ width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
 
 
-terms = 10
-# datafilter = np.array([1/terms]*terms)
-x = np.linspace(0, terms, terms)
-std = 4     # In units of bins
-mu = terms/2
-gaussian = np.exp(-np.power((x - mu)/std, 2)/2)/(std * np.sqrt(2*np.pi))
-datafilter = gaussian / gaussian.sum()
-filter_description = f"Black lines indicate Gaussian smoothing with $\sigma = {std}$ bins and convolution kernel of size {terms} bins."
+kernel_size = 30
+x = np.linspace(0, kernel_size, kernel_size)
+kernel_std = 4     # In units of bins
+kernel_center = kernel_size/2
+gaussian = np.exp(-np.power((x - kernel_center)/kernel_std, 2)/2)/(kernel_std * np.sqrt(2*np.pi))
+lowpass_filter = gaussian / gaussian.sum()
+filter_description = f"Black lines indicate Gaussian smoothing (a low-pass filter) with $\sigma = {kernel_std}$ bins and convolution kernel of size {kernel_size} bins."
 
 
 x_lim = 250
@@ -115,8 +115,39 @@ for i, ax in enumerate(axs):
     plt.sca(ax)
     plt.bar(bins, sizes, width = width, color = colors[i], alpha = 0.7, align = 'center')
     
-    filtered = np.convolve(sizes, datafilter, mode = 'same')
+    filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
     plt.plot(bins, filtered, '-', color = 'black', linewidth = 0.5)
+    maxima, = argrelextrema(filtered, np.greater)
+    plt.plot(bins[maxima], filtered[maxima], 'o', fillstyle = 'none', color = grid_color)
+    
+    second_derivative_resolution = 20
+    twice_filtered = np.convolve(filtered, [1/second_derivative_resolution]*second_derivative_resolution, mode = 'same')
+    # plt.plot(bins, twice_filtered, linewidth = 0.5)
+    
+    derivative = np.gradient(twice_filtered, bins)
+    second_derivative = np.gradient(derivative, bins)
+    second_deriv_negative = (second_derivative < -10)
+    where_second_deriv_negative, = np.where(second_deriv_negative)
+    maxima_np = np.array([index for index in maxima if index in where_second_deriv_negative])
+    assert len(maxima_np) != 0, 'No peaks found. The second derivative threshold may be too high.'
+    plt.plot(bins[maxima_np], filtered[maxima_np], '.', fillstyle = 'none', color = 'blue')
+    
+    # plt.plot(bins[deriv_zero], filtered[deriv_zero], '.', fillstyle = 'none', color = 'red')
+    # plt.plot(bins[second_deriv_negative], filtered[second_deriv_negative], '.', fillstyle = 'none', color = 'orange')
+    # plt.plot(bins[maxima_np], filtered[maxima_np], '.', fillstyle = 'none', color = 'blue')
+    # plt.plot(bins, derivative, '.', fillstyle = 'none', color = 'red')
+    
+    # datapeaks_cwt = find_peaks_cwt(sizes, np.arange(10, 20))
+    # plt.plot(bins[datapeaks_cwt], sizes[datapeaks_cwt], '.', color = 'red')
+    # filteredpeaks_cwt = find_peaks_cwt(filtered, np.arange(10, 20))
+    # plt.plot(bins[filteredpeaks_cwt], filtered[filteredpeaks_cwt], '.', color = 'purple')
+    
+    # savgol_filtered = savgol_filter(sizes, 50, 2)
+    # plt.plot(bins, savgol_filtered, '-', color = 'green', linewidth = 0.5)
+    # savgol_twicefiltered = savgol_filter(filtered, 50, 2)
+    # plt.plot(bins, savgol_twicefiltered, '-', color = 'green', linewidth = 0.5)
+    
+    
     
     overall_max = max(sizes.max(), overall_max)
     if previous_sizes is not None:
