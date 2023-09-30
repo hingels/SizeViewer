@@ -66,12 +66,7 @@ class Sample():
         if hasattr(self, 'name') is False:
             self.name = os.path.basename(folder).removeprefix(prefix).removesuffix(suffix)
 
-samples = [Sample(os.path.join(datafolder, folder)) for folder in os.listdir(datafolder)]
-for sample in samples:
-    if hasattr(sample, 'name'):
-        print(sample.name)
-# print(os.listdir(datafolder))
-
+all_samples = {(sample := Sample(os.path.join(datafolder, folder))).name: sample for folder in os.listdir(datafolder)}
 all_dat_files = {
     filename.removeprefix(prefix).removesuffix(suffix): os.path.join(path, filename)
     for (path, subdirs, files) in os.walk(datafolder) for filename in files
@@ -84,6 +79,7 @@ all_xml_files = {
 #     os.path.basename(path): os.path.join(path, filename)
 #     for (path, subdirs, files) in os.walk(datafolder) for filename in files
 #     if filename == 'info.md'}
+samples = [all_samples[name] for name in names]
 filepaths = [all_dat_files[name] for name in names]
 xml_filepaths = [all_xml_files[name] for name in names]
 # md_filepaths = [all_md_files[name] for name in names]
@@ -185,15 +181,21 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
 class Setting():
-    def __init__(self, name, units, column = None, value = None, show_unit = False, datatype = str):
+    def __init__(self, name, units, column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str):
         self.name = name
         self.units = units
         self.column = column
-        if value is None:
-            self.value = value
+        if sample_values is None:
+            self.sample_values = dict()
         else:
-            self.value = datatype(value)
-        self.show_unit = False
+            self.sample_values = {sample_id: datatype(value) for sample_id, value in sample_values.items()}
+        self.show_unit = show_unit
+        self.show_name = show_name
+        self.datatype = datatype
+    def add_value(self, sample: Sample, value):
+        self.sample_values[sample] = self.datatype(value)
+    def get_value(self, sample: Sample):
+        return self.sample_values[sample]
 class Settings():
     def __init__(self, settings_dict):
         self.tags = settings_dict
@@ -206,23 +208,22 @@ class Settings():
         self.columns = columns
     def by_tag(self, tag):
         return self.tags[tag]
-    def set_value(self, value):
-        self.value = self.datatype(value)
 
+
+settings = Settings(OrderedDict({
+    'RedLaserPower': Setting('R', 'mW', column = 1, datatype = int, show_name = True),
+    'GreenLaserPower': Setting('G', 'mW', column = 1, datatype = int, show_name = True),
+    'BlueLaserPower': Setting('B', 'mW', column = 1, datatype = int, show_name = True),
+    'Exposure': Setting('Exposure', 'dB', column = 2, datatype = int)}))
 
 def generate_rows():
     for i, ax in enumerate(axs):
         row = []
         
-        name = os.path.basename(filepaths[i])
-        name = name.removeprefix(prefix)
-        name = name.removesuffix(suffix)
+        sample = samples[i]
+        name = sample.name
         row.append(name)
-        
-        settings = Settings(OrderedDict({
-            'RedLaserPower': Setting('R', 'mW', column = 1, datatype = int),
-            'GreenLaserPower': Setting('G', 'mW', column = 1, datatype = int),
-            'BlueLaserPower': Setting('B', 'mW', column = 1, datatype = int)}))
+                
         with open(xml_filepaths[i]) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
@@ -230,13 +231,12 @@ def generate_rows():
                 tag = entry.tag
                 if tag in settings.tags:
                     setting = settings.by_tag(tag)
-                    setting.value = entry.text
+                    setting.add_value(sample, entry.text)
                     
         for column in settings.columns:
-            if setting.show_unit:
-                content = '\n'.join(f"{setting.name}: {setting.value} ({setting.units})" for setting in column)
-            else:
-                content = '\n'.join(f"{setting.name}: {setting.value}" for setting in column)
+            content = '\n'.join(
+                setting.show_name*f"{setting.name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
+                for setting in column )
             row.append(content)
         
         yield row
@@ -246,9 +246,10 @@ margin = 0
 display_coords = final_ax.transData.transform([0, overall_min])
 edge = right_edge_figure + margin
 
-column_names = ["Sample", "Power\n(mW)"]
+# column_names = ["Sample", "Power\n(mW)"]
 # column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
-column_widths = [0.5, 0.5]
+column_names = ["Sample", "Power\n(mW)", "Exposure (dB)"]
+column_widths = [0.6, 0.2, 0.2]
 assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
 
 table = plt.table(
