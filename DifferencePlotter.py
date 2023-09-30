@@ -22,7 +22,6 @@ width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
 
 x_lim = 250
-# datafolder = "/Users/henryingels/Desktop/Complete data copy/"
 datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
@@ -52,7 +51,9 @@ class Sample():
                     info = full_path
                 split_name = filename.split('_')
                 if filename.endswith('.xml') and len(split_name) > 2:
-                    xml = full_path
+                    truncated = '_'.join(split_name[:-2])
+                    if truncated.endswith('Process') is False and truncated.endswith('Temperature') is False:
+                        xml = full_path
                 if filename.startswith(prefix) and filename.endswith(suffix):
                     dat = full_path
         self.info = info
@@ -66,26 +67,16 @@ class Sample():
         if hasattr(self, 'name') is False:
             self.name = os.path.basename(folder).removeprefix(prefix).removesuffix(suffix)
 
-all_samples = {(sample := Sample(os.path.join(datafolder, folder))).name: sample for folder in os.listdir(datafolder)}
-all_dat_files = {
-    filename.removeprefix(prefix).removesuffix(suffix): os.path.join(path, filename)
-    for (path, subdirs, files) in os.walk(datafolder) for filename in files
-    if filename.startswith(prefix) and filename.endswith(suffix)}
-all_xml_files = {
-    '_'.join(split_name[:-2]): os.path.join(path, filename)
-    for (path, subdirs, files) in os.walk(datafolder) for filename in files
-    if filename.endswith('.xml') and len(split_name := filename.split('_')) > 2}
-# all_md_files = {
-#     os.path.basename(path): os.path.join(path, filename)
-#     for (path, subdirs, files) in os.walk(datafolder) for filename in files
-#     if filename == 'info.md'}
-samples = [all_samples[name] for name in names]
-filepaths = [all_dat_files[name] for name in names]
-xml_filepaths = [all_xml_files[name] for name in names]
-# md_filepaths = [all_md_files[name] for name in names]
+def generate_samples():
+    for folder in os.listdir(datafolder):
+        sample = Sample(os.path.join(datafolder, folder))
+        if sample.name not in names: continue
+        yield sample.name, sample
+unordered_samples = dict(generate_samples())
+samples = [unordered_samples[name] for name in names]
 
 
-num_of_plots = len(filepaths)
+num_of_plots = len(samples)
 height *= (num_of_plots/3)
 height = min(np.floor(65536/resolution), height)
 mpl.rcParams["figure.figsize"] = [width, height]
@@ -103,7 +94,9 @@ final_i = num_of_plots - 1
 overall_min, overall_max = 0, 0
 previous_sizes = None
 for i, ax in enumerate(axs):
-    data = pd.read_csv(filepaths[i], sep = '\t ', engine = 'python').iloc[:250, :]
+    sample = samples[i]
+    
+    data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python').iloc[:250, :]
     bins = data['CenterBinDiameter_[nm]']
     sizes = data['PSD_corrected_[counts/mL/nm]']
     width = bins[1] - bins[0]
@@ -224,7 +217,7 @@ def generate_rows():
         name = sample.name
         row.append(name)
                 
-        with open(xml_filepaths[i]) as xml_file:
+        with open(sample.xml) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
             for entry in root.find('RecordingSettings'):
