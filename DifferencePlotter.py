@@ -60,6 +60,15 @@ filenames = [
 ]
 
 
+# column_names = ["Sample", "Power\n(mW)"]
+# column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
+column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)"]
+column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08]
+assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
+table_width = 1.5
+table_margin = 0
+
+
 class Sample():
     def __init__(self, folder):
         self.folder = folder
@@ -95,12 +104,7 @@ class Sample():
         self.filename = filename
         if hasattr(self, 'name') is False:
             self.name = filename
-        
-        # self.siblings = []
-    # def find_similar(self, samples):
-    #     if hasattr(self, 'measurement') is False: return
-    #     for sample in samples:
-            
+                    
 
 def generate_samples():
     for folder in os.listdir(datafolder):
@@ -110,18 +114,6 @@ def generate_samples():
 unordered_samples = dict(generate_samples())
 samples = [unordered_samples[name] for name in filenames]
 
-# # measurement_numbers = {sample.measurement: sample if hasattr(sample, 'measurement') for sample in samples}
-# measurement_numbers = dict()
-# for sample in samples:
-#     if hasattr(sample, 'measurement') is False: continue
-#     measurement = sample.measurement
-#     if measurement not in measurement_numbers:
-#         measurement_numbers[measurement] = []
-#     measurement_numbers[measurement].append(sample)
-# for measurement_number, shared_samples in measurement_numbers.items():
-#     for sample in shared_samples:
-#         for other_sample in shared_samples:
-            
 
 
 num_of_plots = len(samples)
@@ -133,17 +125,38 @@ colors = cm.plasma(np.linspace(0, 1, num_of_plots))
 
 fig, axs = plt.subplots(num_of_plots, 1)
 fig.subplots_adjust(hspace=-0.05*height)
+
+# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-(table_width+table_margin), right=fig.subplotpars.right-(table_width+table_margin))
+# print(fig.subplotpars.left, fig.subplotpars.right)
+# print(fig.subplotpars.left-(table_width+table_margin+1))
+# print(fig.subplotpars.right-(table_width+table_margin+1))
+## fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-(table_width+table_margin+1), right=fig.subplotpars.right-(table_width+table_margin+1))
+# subplots_width = fig.subplotpars.right - fig.subplotpars.left
+# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-fig.subplotpars.right*(table_width+table_margin+1+0.2), right=fig.subplotpars.right-fig.subplotpars.right*(table_width+table_margin+1+0.2))
+# print(subplots_width)
+table_left_edge = fig.subplotpars.right
+print(table_left_edge)
+# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-table_left_edge*(table_width+table_margin+1+2), right=fig.subplotpars.right-table_left_edge*(table_width+table_margin+1+2))
+# subplots_width = fig.subplotpars.right - fig.subplotpars.left
+# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-subplots_width*(table_width+table_margin), right=fig.subplotpars.right-subplots_width*(table_width+table_margin))
+
+# plt.margins(1000) # wspace=width*(1+table_width+table_margin+2000)
 transFigure = fig.transFigure
 
 
 final_i = num_of_plots - 1
 overall_min, overall_max = 0, 0
+cumulative_sums = []
+bins = None
 previous_sizes = None
 for i, ax in enumerate(axs):
     sample = samples[i]
     
     data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python').iloc[:250, :]
-    bins = data['CenterBinDiameter_[nm]']
+    new_bins = data['CenterBinDiameter_[nm]']
+    if bins is not None:
+        assert np.all(new_bins == bins) == True, 'Unequal sequence of bins between samples detected!'
+    bins = new_bins
     sizes = data['PSD_corrected_[counts/mL/nm]']
     width = bins[1] - bins[0]
     
@@ -169,10 +182,8 @@ for i, ax in enumerate(axs):
     plt.plot(bins[maxima], filtered[maxima], **maxima_marker)
     
     
-    cumulative = np.cumsum(sizes)
-    plt.plot(bins, cumulative/100)
+    cumulative_sums.append(np.cumsum(sizes))    
         
-    
     
     overall_max = max(sizes.max(), overall_max)
     if previous_sizes is not None:
@@ -196,6 +207,14 @@ for i, ax in enumerate(axs):
     previous_sizes = sizes
     
 
+max_of_cumulative_sums = 0
+for cumulative_sum in cumulative_sums:
+    this_max = max(cumulative_sum)
+    if this_max > max_of_cumulative_sums:
+        max_of_cumulative_sums = this_max
+cumulative_sum_scaling = overall_max / max_of_cumulative_sums
+
+
 origins = []
 for i, ax in enumerate(axs):
     plt.sca(ax)
@@ -206,6 +225,9 @@ for i, ax in enumerate(axs):
         ax.spines['bottom'].set_position(('data', 0))
     origin_transDisplay = ax.transData.transform([0, 0])
     origins.append(transFigure.inverted().transform(origin_transDisplay))
+    
+    cumulative_sum = cumulative_sums[i]
+    plt.plot(bins, cumulative_sum*cumulative_sum_scaling, color = 'red', linewidth = 0.5)
 
 final_ax = ax   # Using the ax from the final (bottom) plot:
 final_ax.xaxis.set_tick_params(width = 2)
@@ -229,24 +251,42 @@ for i, tick_value in enumerate(tick_values):
     if i == final_i:
         right_edge, _ = display_coords
         right_edge_figure = figure_x
-    
 
-text_shift = 0.1
+print(right_edge_figure)
 
-plt.text(0, 0.45 + text_shift, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
 
-plt.text(0, 0.95 + text_shift, "Shadows show difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
-plt.text(0, 0.93 + text_shift, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+text_shift = 0.05
+
+plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
+
+
+# text_y = 0.95 + text_shift
+text_y = 0 + text_shift
+
+plt.text(0, text_y, "Shadows show difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+
+text_y -= 0.02
+plt.text(0, text_y, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+
+text_y -= 0.02
+plt.text(0, text_y, f"Red lines are cumulative sums of unsmoothed data, scaled by {cumulative_sum_scaling:.3}.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+
 
 icon_x = 0.01
 text_x = 0.02
-rejected_maxima_icon, = plt.plot([icon_x], [0.91 + text_shift], **rejected_maxima_marker, transform = transFigure)
+
+text_y -= 0.02
+rejected_maxima_icon, = plt.plot([icon_x], [text_y], **rejected_maxima_marker, transform = transFigure)
 rejected_maxima_icon.set_clip_on(False)
-plt.text(text_x, 0.91 + text_shift, maxima_candidate_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
-maxima_icon, = plt.plot([icon_x], [0.89 + text_shift], **maxima_marker, transform = transFigure)
+plt.text(text_x, text_y, maxima_candidate_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+
+text_y -= 0.02
+maxima_icon, = plt.plot([icon_x], [text_y], **maxima_marker, transform = transFigure)
 maxima_icon.set_clip_on(False)
-plt.text(text_x, 0.89 + text_shift, maxima_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
-plt.text(0, 0.87 + text_shift, "Measured at room temperature.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+plt.text(text_x, text_y, maxima_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+
+text_y -= 0.02
+plt.text(0, text_y, "Measured at room temperature.", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 
 axis_positions = [origin[1] for origin in origins]
@@ -314,15 +354,11 @@ settings = Settings(OrderedDict({
     'Exposure': Setting('Exposure', 'ms', column = 1, datatype = int),
     'Gain': Setting('Gain', 'dB', column = 2, datatype = int)}))
 
-# row_groups = []
 def generate_rows():
     for i, ax in enumerate(axs):
         row = []
         
         sample = samples[i]
-        
-        # name = sample.name
-        # row.append(name)
         
         if hasattr(sample, 'treatment'):
             treatment1 = sample.treatment
@@ -376,16 +412,9 @@ def generate_rows():
 
         yield row
 
-table_width = 1.5
-margin = 0
-display_coords = final_ax.transData.transform([0, overall_min])
-edge = right_edge_figure + margin
 
-# column_names = ["Sample", "Power\n(mW)"]
-# column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
-column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)"]
-column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08]
-assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
+display_coords = final_ax.transData.transform([0, overall_min])
+edge = right_edge_figure + table_margin
 
 table = plt.table(
     tuple(generate_rows()),
@@ -394,6 +423,7 @@ table = plt.table(
     cellLoc = 'left', colWidths = column_widths)
 table.auto_set_font_size(False)
 table.set_fontsize(12)
+fig.add_artist(table)
 
 
 for i, name in enumerate(column_names):
@@ -404,3 +434,48 @@ for i, name in enumerate(column_names):
 for cell in table.get_celld().values():
     cell.set(edgecolor = grid_color)
 
+# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-(table_width+table_margin+1), right=fig.subplotpars.right-(table_width+table_margin+1))
+
+# width, height = fig.get_size_inches()
+# # height = min(np.floor(65536/resolution), height*1.1)
+# height *= 2
+# fig.set_size_inches(width, height)
+
+# fig.canvas.draw()
+# plt.tight_layout()
+
+# # Adapted from StackOverflow:
+# from copy import deepcopy
+# desired_sf = [2.0, 1.5]
+# x_scale, y_scale = 2, 1
+# old_width, old_height = deepcopy(fig.get_size_inches())
+# fig.set_size_inches([old_width * x_scale, old_height * y_scale], forward = True)
+# fig.canvas.draw()
+# new_width, new_height = fig.get_size_inches()
+# x_scale, y_scale = new_width/old_width, new_height/old_height
+# for subax in fig.axes:
+#     pos = subax.get_position()
+#     subax.set_position([pos.x0 / x_scale, pos.y0 / y_scale, pos.width / x_scale, pos.height / y_scale])
+# for text in fig.texts:
+#     pos = np.array(text.get_position())
+#     text.set_position(pos / (x_scale, y_scale))
+# for line in fig.lines:
+#     x = line.get_xdata()
+#     y = line.get_ydata()
+#     line.set_xdata(x / x_scale)
+#     line.set_ydata(y / y_scale)
+#     print(line)
+# for patch in fig.patches:
+#     xy = patch.get_xy()
+#     patch.set_xy(xy / (x_scale, y_scale))
+# for artist in fig.artists:
+#     print(type(artist))
+#     if type(artist) is plt.Line2D:
+#         line = artist
+#         x = line.get_xdata()
+#         y = line.get_ydata()
+#         line.set_xdata(x / x_scale)
+#         line.set_ydata(y / y_scale)
+#     elif type(artist) is plt.table.Table:
+#         table = artist
+# fig.canvas.draw()
