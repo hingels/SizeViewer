@@ -17,12 +17,12 @@ from matplotlib import pyplot as plt, cm
 import pandas as pd
 import numpy as np
 
-datafolder = "/Users/henryingels/Desktop/Complete data copy/"
+datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
 names = [
-    "230709 1-100000 standard",
-    "230709 1-100000 standard #2",
+    # "230709 1-100000 standard",
+    # "230709 1-100000 standard #2",
     "230729 dilut L1-100 contr",
     "230729 dilut L1-100 contr #2",
     "230728 KW+EW",

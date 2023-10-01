@@ -155,9 +155,10 @@ for i, ax in enumerate(axs):
     maxima_candidates, = argrelextrema(filtered, np.greater)
     
     twice_filtered = np.convolve(filtered, [1/kernel2_size]*kernel2_size, mode = 'same')
-    plt.plot(bins, twice_filtered, linewidth = 0.5)
+    # plt.plot(bins, twice_filtered, linewidth = 0.5)
     derivative = np.gradient(twice_filtered, bins)
     second_derivative = np.gradient(derivative, bins)
+    # plt.plot(bins, second_derivative*100, linewidth = 0.5)
     second_deriv_negative, = np.where(second_derivative < second_derivative_threshold)
 
     maxima = np.array([index for index in maxima_candidates if index in second_deriv_negative])
@@ -166,6 +167,10 @@ for i, ax in enumerate(axs):
     rejected_candidates = np.array([entry for entry in maxima_candidates if entry not in maxima])
     plt.plot(bins[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
     plt.plot(bins[maxima], filtered[maxima], **maxima_marker)
+    
+    
+    cumulative = np.cumsum(sizes)
+    plt.plot(bins, cumulative/100)
         
     
     
@@ -230,7 +235,7 @@ text_shift = 0.1
 
 plt.text(0, 0.45 + text_shift, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
 
-plt.text(0, 0.95 + text_shift, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+plt.text(0, 0.95 + text_shift, "Shadows show difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
 plt.text(0, 0.93 + text_shift, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 icon_x = 0.01
@@ -241,6 +246,7 @@ plt.text(text_x, 0.91 + text_shift, maxima_candidate_description, fontsize=12, t
 maxima_icon, = plt.plot([icon_x], [0.89 + text_shift], **maxima_marker, transform = transFigure)
 maxima_icon.set_clip_on(False)
 plt.text(text_x, 0.89 + text_shift, maxima_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+plt.text(0, 0.87 + text_shift, "Measured at room temperature.", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 
 axis_positions = [origin[1] for origin in origins]
@@ -251,19 +257,22 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
 class Setting():
-    def __init__(self, name, units, column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str):
+    def __init__(self, name, units, column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None):
         self.name = name
         self.units = units
         self.column = column
-        if sample_values is None:
-            self.sample_values = dict()
-        else:
-            self.sample_values = {sample_id: datatype(value) for sample_id, value in sample_values.items()}
+        self.sample_values = dict()
+        if sample_values is not None:
+            for sample, value in sample_values.items():
+                self.set_value(sample, value)
+        
         self.show_unit = show_unit
         self.show_name = show_name
         self.datatype = datatype
-    def add_value(self, sample: Sample, value):
-        self.sample_values[sample] = self.datatype(value)
+        self.depends_on = depends_on
+    def set_value(self, sample: Sample, value):
+        datatype = self.datatype
+        self.sample_values[sample] = datatype(value) if datatype is not bool else value.lower() == "true"
     def get_value(self, sample: Sample):
         return self.sample_values[sample]
 class Settings():
@@ -271,20 +280,39 @@ class Settings():
         self.tags = settings_dict
         columns = []
         for setting in settings_dict.values():
-            column = setting.column - 1     # -1 to account for the title column
+            column = setting.column
+            if column is None: continue
             if column > (len(columns) - 1):
                 columns.append([])
             columns[column].append(setting)
         self.columns = columns
     def by_tag(self, tag):
         return self.tags[tag]
+    def apply_dependencies(self):
+        '''
+        For any setting that is dependent on another setting, set it to zero (or equivalent) if the dependency has a value of False.
+        '''
+        for tag in self.tags:
+            setting = self.by_tag(tag)
+            depends_on = setting.depends_on
+            if depends_on is None: continue
+            for sample, value in setting.sample_values.items():
+                if depends_on.get_value(sample) is False:
+                    setting.set_value(sample, setting.datatype(0))
 
 
+red_enabled = Setting('Red enabled', '', datatype = bool)
+green_enabled = Setting('Green enabled', '', datatype = bool)
+blue_enabled = Setting('Blue enabled', '', datatype = bool)
 settings = Settings(OrderedDict({
-    'RedLaserPower': Setting('R', 'mW', column = 1, datatype = int, show_name = True),
-    'GreenLaserPower': Setting('G', 'mW', column = 1, datatype = int, show_name = True),
-    'BlueLaserPower': Setting('B', 'mW', column = 1, datatype = int, show_name = True),
-    'Exposure': Setting('Exposure', 'dB', column = 2, datatype = int)}))
+    'RedLaserPower': Setting('R', 'mW', column = 0, datatype = int, show_name = True, depends_on = red_enabled),
+    'RedLaserEnabled': red_enabled,
+    'GreenLaserPower': Setting('G', 'mW', column = 0, datatype = int, show_name = True, depends_on = green_enabled),
+    'GreenLaserEnabled': green_enabled,
+    'BlueLaserPower': Setting('B', 'mW', column = 0, datatype = int, show_name = True, depends_on = blue_enabled),
+    'BlueLaserEnabled': blue_enabled,
+    'Exposure': Setting('Exposure', 'ms', column = 1, datatype = int),
+    'Gain': Setting('Gain', 'dB', column = 2, datatype = int)}))
 
 # row_groups = []
 def generate_rows():
@@ -337,49 +365,33 @@ def generate_rows():
                 tag = entry.tag
                 if tag in settings.tags:
                     setting = settings.by_tag(tag)
-                    setting.add_value(sample, entry.text)
+                    setting.set_value(sample, entry.text)
+        settings.apply_dependencies()
                     
         for column in settings.columns:
             content = '\n'.join(
                 setting.show_name*f"{setting.name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
                 for setting in column )
             row.append(content)
-        
-        cell_kwargs = {'cellColours': ['w']*len(row)}
-        # if hasattr(sample, 'measurement'):
-        #     measurement = int(sample.measurement)
-        #     cell_kwargs['cellColours'] = [colors[measurement]]*len(row)
-        #     # info = sample.info            
-        #     # if info not in row_colors:
-        #     #     row_colors[info] = []
-        #     # row_colors[info].append((measurement, sample))
 
-        yield row, cell_kwargs
+        yield row
 
-table_width = 1
+table_width = 1.5
 margin = 0
 display_coords = final_ax.transData.transform([0, overall_min])
 edge = right_edge_figure + margin
 
 # column_names = ["Sample", "Power\n(mW)"]
 # column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
-column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(dB)"]
-column_widths = [0.15, 0.07, 0.15, 0.07, 0.21, 0.1, 0.1, 0.15]
+column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)"]
+column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08]
 assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
 
-rows, cell_kwargs = zip(*generate_rows())
-# print(cell_kwargs)
-cell_kwargs_merged = dict()
-for kwargs in cell_kwargs:
-    for key, value in kwargs.items():
-        if key not in cell_kwargs_merged: cell_kwargs_merged[key] = []
-        cell_kwargs_merged[key].append(value)
-# print(cell_kwargs_merged)
 table = plt.table(
-    rows,
+    tuple(generate_rows()),
     bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]),
     transform = transFigure,
-    cellLoc = 'left', colWidths = column_widths, **cell_kwargs_merged)
+    cellLoc = 'left', colWidths = column_widths)
 table.auto_set_font_size(False)
 table.set_fontsize(12)
 
