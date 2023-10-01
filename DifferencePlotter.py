@@ -14,6 +14,9 @@ import scipy
 from scipy.signal import argrelextrema
 from collections import OrderedDict
 
+from sample_class import Sample
+from settings_classes import Setting, Settings
+
 import matplotlib as mpl
 resolution = 200
 mpl.rcParams['figure.dpi'] = resolution
@@ -60,60 +63,27 @@ filenames = [
 ]
 
 
-table_width = 1.5
+table_width = 1.2
 table_left_margin = 0
-minimum_table_right_margin = 0.05
+minimum_table_right_margin = 0.03
 # column_names = ["Sample", "Power\n(mW)"]
 # column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
 # column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration\n(s)", "Number\nof\nvideos"]
 column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity"]
-# column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08]
+column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08, 0.16]
 # column_widths = [0.07, 0.05, 0.07, 0.05, 0.12, 0.05, 0.07, 0.07, 0.08, 0.08, 0.08]
-column_widths = [0.07, 0.05, 0.07, 0.05, 0.12, 0.05, 0.07, 0.07, 0.08, 0.08]
-assert (width_sum := sum(column_widths)) <= (table_width - minimum_table_right_margin), f"Column widths sum to {width_sum} > (table_width - minimum_table_right_margin) = {(table_width - minimum_table_right_margin)}."
-
-
-
-class Sample():
-    def __init__(self, folder):
-        self.folder = folder
-        info_path = None
-        xml_path = None
-        dat_path = None
-        for (path, subdirs, files) in os.walk(folder):
-            for filename in files:
-                full_path = os.path.join(path, filename)
-                if filename == 'info.md':
-                    info_path = full_path
-                split_name = filename.split('_')
-                if filename.endswith('.xml') and len(split_name) > 2:
-                    truncated = '_'.join(split_name[:-2])
-                    if truncated.endswith('Process') is False and truncated.endswith('Temperature') is False:
-                        xml_path = full_path
-                if filename.startswith(prefix) and filename.endswith(suffix):
-                    dat_path = full_path
-        self.xml = xml_path
-        self.dat = dat_path
-        
-        info = dict()
-        if info_path is not None:
-            with open(info_path) as info_file:
-                for line in info_file.readlines():
-                    prop, value = line.split('=')
-                    value = value.strip()
-                    setattr(self, prop, value)
-                    info[prop] = value
-        self.info = info
-        
-        filename = os.path.basename(folder).removeprefix(prefix).removesuffix(suffix)
-        self.filename = filename
-        if hasattr(self, 'name') is False:
-            self.name = filename
+# column_widths = np.array([0.07, 0.05, 0.07, 0.05, 0.12, 0.05, 0.07, 0.07, 0.08, 0.08])/table_width
+width_sum = sum(column_widths)
+table_right_margin = table_width - width_sum
+# assert width_sum <= (table_width - minimum_table_right_margin), f"Column widths sum to {width_sum} > (table_width - minimum_table_right_margin) = {(table_width - minimum_table_right_margin)}."
+assert table_right_margin >= minimum_table_right_margin, f"table_right_margin = {table_right_margin} < minimum_table_right_margin = {minimum_table_right_margin}."
+column_widths = np.append(column_widths, table_right_margin)
+column_names.append("")
                     
 
 def generate_samples():
     for folder in os.listdir(datafolder):
-        sample = Sample(os.path.join(datafolder, folder))
+        sample = Sample(os.path.join(datafolder, folder), prefix, suffix)
         if sample.name not in filenames: continue
         yield sample.filename, sample
 unordered_samples = dict(generate_samples())
@@ -285,51 +255,6 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
 
-class Setting():
-    def __init__(self, name, units, column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None):
-        self.name = name
-        self.units = units
-        self.column = column
-        self.sample_values = dict()
-        if sample_values is not None:
-            for sample, value in sample_values.items():
-                self.set_value(sample, value)
-        
-        self.show_unit = show_unit
-        self.show_name = show_name
-        self.datatype = datatype
-        self.depends_on = depends_on
-    def set_value(self, sample: Sample, value):
-        datatype = self.datatype
-        self.sample_values[sample] = datatype(value) if datatype is not bool else value.lower() == "true"
-    def get_value(self, sample: Sample):
-        return self.sample_values[sample]
-class Settings():
-    def __init__(self, settings_dict):
-        self.tags = settings_dict
-        columns = []
-        for setting in settings_dict.values():
-            column = setting.column
-            if column is None: continue
-            if column > (len(columns) - 1):
-                columns.append([])
-            columns[column].append(setting)
-        self.columns = columns
-    def by_tag(self, tag):
-        return self.tags[tag]
-    def apply_dependencies(self):
-        '''
-        For any setting that is dependent on another setting, set it to zero (or equivalent) if the dependency has a value of False.
-        '''
-        for tag in self.tags:
-            setting = self.by_tag(tag)
-            depends_on = setting.depends_on
-            if depends_on is None: continue
-            for sample, value in setting.sample_values.items():
-                if depends_on.get_value(sample) is False:
-                    setting.set_value(sample, setting.datatype(0))
-
-
 red_enabled = Setting('Red enabled', '', datatype = bool)
 green_enabled = Setting('Green enabled', '', datatype = bool)
 blue_enabled = Setting('Blue enabled', '', datatype = bool)
@@ -409,16 +334,12 @@ def generate_rows():
         frames_per_video = settings.by_tag('FramesPerVideo').get_value(sample)
         video_duration = frames_per_video / framerate
         if video_duration.is_integer():
-            video_duration = int(video_duration)
-        # row.append(video_duration)
-        
+            video_duration = int(video_duration)        
         num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
-        # row.append(num_of_videos)
-        
         row.append(f"{video_duration}x{num_of_videos}")
         
+        row.append("")
         
-
         yield row
 
 
@@ -438,9 +359,11 @@ fig.add_artist(table)
 for i, name in enumerate(column_names):
     new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.1, text = name, loc = 'left')
     new_cell.set_text_props(fontweight = 'bold')
-margin_cell = table.add_cell(-1, len(column_names), width = table_width - width_sum, height = 0.1)
-for cell in table.get_celld().values():
-    if cell is margin_cell:
+# margin_cell = table.add_cell(-1, len(column_names), width = table_width - width_sum, height = 0.1)
+final_column = len(column_widths) - 1
+for (row, column), cell in table.get_celld().items():
+    # if cell is margin_cell:
+    if column == final_column:
         cell.set(edgecolor = None)
         continue
     cell.set(edgecolor = grid_color)
