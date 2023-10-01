@@ -10,7 +10,8 @@ import os
 import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
-from scipy.signal import argrelextrema, find_peaks_cwt, savgol_filter
+import scipy
+from scipy.signal import argrelextrema
 from collections import OrderedDict
 
 import matplotlib as mpl
@@ -22,6 +23,11 @@ mpl.rcParams['axes.spines.right'] = False
 width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
 
+grid_color = '0.8'
+
+rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}
+maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'}
+
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -30,6 +36,11 @@ kernel_center = kernel_size/2
 gaussian = np.exp(-np.power((x - kernel_center)/kernel_std, 2)/2)/(kernel_std * np.sqrt(2*np.pi))
 lowpass_filter = gaussian / gaussian.sum()
 filter_description = f"Black lines indicate Gaussian smoothing (a low-pass filter) with $\sigma = {kernel_std}$ bins and convolution kernel of size {kernel_size} bins."
+
+kernel2_size = 20
+second_derivative_threshold = -30
+maxima_candidate_description = f": Candidate peaks after smoothing, selected using argrelextrema in SciPy {scipy.__version__}."
+maxima_description = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of size {kernel2_size} bins."
 
 
 x_lim = 250
@@ -93,8 +104,6 @@ height = min(np.floor(65536/resolution), height)
 mpl.rcParams["figure.figsize"] = [width, height]
 colors = cm.plasma(np.linspace(0, 1, num_of_plots))
 
-grid_color = '0.8'
-
 
 fig, axs = plt.subplots(num_of_plots, 1)
 fig.subplots_adjust(hspace=-0.05*height)
@@ -117,36 +126,21 @@ for i, ax in enumerate(axs):
     
     filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
     plt.plot(bins, filtered, '-', color = 'black', linewidth = 0.5)
-    maxima, = argrelextrema(filtered, np.greater)
-    plt.plot(bins[maxima], filtered[maxima], 'o', fillstyle = 'none', color = grid_color)
+    maxima_candidates, = argrelextrema(filtered, np.greater)
     
-    second_derivative_resolution = 20
-    twice_filtered = np.convolve(filtered, [1/second_derivative_resolution]*second_derivative_resolution, mode = 'same')
-    # plt.plot(bins, twice_filtered, linewidth = 0.5)
-    
+    twice_filtered = np.convolve(filtered, [1/kernel2_size]*kernel2_size, mode = 'same')
+    plt.plot(bins, twice_filtered, linewidth = 0.5)
     derivative = np.gradient(twice_filtered, bins)
     second_derivative = np.gradient(derivative, bins)
-    second_deriv_negative = (second_derivative < -10)
-    where_second_deriv_negative, = np.where(second_deriv_negative)
-    maxima_np = np.array([index for index in maxima if index in where_second_deriv_negative])
-    assert len(maxima_np) != 0, 'No peaks found. The second derivative threshold may be too high.'
-    plt.plot(bins[maxima_np], filtered[maxima_np], '.', fillstyle = 'none', color = 'blue')
+    second_deriv_negative, = np.where(second_derivative < second_derivative_threshold)
+
+    maxima = np.array([index for index in maxima_candidates if index in second_deriv_negative])
+    assert len(maxima) != 0, 'No peaks found. The second derivative threshold may be too high.'
     
-    # plt.plot(bins[deriv_zero], filtered[deriv_zero], '.', fillstyle = 'none', color = 'red')
-    # plt.plot(bins[second_deriv_negative], filtered[second_deriv_negative], '.', fillstyle = 'none', color = 'orange')
-    # plt.plot(bins[maxima_np], filtered[maxima_np], '.', fillstyle = 'none', color = 'blue')
-    # plt.plot(bins, derivative, '.', fillstyle = 'none', color = 'red')
-    
-    # datapeaks_cwt = find_peaks_cwt(sizes, np.arange(10, 20))
-    # plt.plot(bins[datapeaks_cwt], sizes[datapeaks_cwt], '.', color = 'red')
-    # filteredpeaks_cwt = find_peaks_cwt(filtered, np.arange(10, 20))
-    # plt.plot(bins[filteredpeaks_cwt], filtered[filteredpeaks_cwt], '.', color = 'purple')
-    
-    # savgol_filtered = savgol_filter(sizes, 50, 2)
-    # plt.plot(bins, savgol_filtered, '-', color = 'green', linewidth = 0.5)
-    # savgol_twicefiltered = savgol_filter(filtered, 50, 2)
-    # plt.plot(bins, savgol_twicefiltered, '-', color = 'green', linewidth = 0.5)
-    
+    rejected_candidates = np.array([entry for entry in maxima_candidates if entry not in maxima])
+    plt.plot(bins[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
+    plt.plot(bins[maxima], filtered[maxima], **maxima_marker)
+        
     
     
     overall_max = max(sizes.max(), overall_max)
@@ -206,10 +200,21 @@ for i, tick_value in enumerate(tick_values):
         right_edge_figure = figure_x
     
 
-plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
+text_shift = 0.05
 
-plt.text(0, 0.95, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
-plt.text(0, 0.93, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+plt.text(0, 0.45 + text_shift, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
+
+plt.text(0, 0.95 + text_shift, "Shadows measure difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+plt.text(0, 0.93 + text_shift, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+
+icon_x = 0.01
+text_x = 0.02
+rejected_maxima_icon, = plt.plot([icon_x], [0.91 + text_shift], **rejected_maxima_marker, transform = transFigure)
+rejected_maxima_icon.set_clip_on(False)
+plt.text(text_x, 0.91 + text_shift, maxima_candidate_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+maxima_icon, = plt.plot([icon_x], [0.89 + text_shift], **maxima_marker, transform = transFigure)
+maxima_icon.set_clip_on(False)
+plt.text(text_x, 0.89 + text_shift, maxima_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 
 axis_positions = [origin[1] for origin in origins]
