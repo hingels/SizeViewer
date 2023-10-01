@@ -63,33 +63,44 @@ filenames = [
 class Sample():
     def __init__(self, folder):
         self.folder = folder
-        info = None
-        xml = None
-        dat = None
+        info_path = None
+        xml_path = None
+        dat_path = None
         for (path, subdirs, files) in os.walk(folder):
             for filename in files:
                 full_path = os.path.join(path, filename)
                 if filename == 'info.md':
-                    info = full_path
+                    info_path = full_path
                 split_name = filename.split('_')
                 if filename.endswith('.xml') and len(split_name) > 2:
                     truncated = '_'.join(split_name[:-2])
                     if truncated.endswith('Process') is False and truncated.endswith('Temperature') is False:
-                        xml = full_path
+                        xml_path = full_path
                 if filename.startswith(prefix) and filename.endswith(suffix):
-                    dat = full_path
-        self.info = info
-        self.xml = xml
-        self.dat = dat
-        if info is not None:
-            with open(info) as info_file:
+                    dat_path = full_path
+        self.xml = xml_path
+        self.dat = dat_path
+        
+        info = dict()
+        if info_path is not None:
+            with open(info_path) as info_file:
                 for line in info_file.readlines():
                     prop, value = line.split('=')
-                    setattr(self, prop, value.strip())
+                    value = value.strip()
+                    setattr(self, prop, value)
+                    info[prop] = value
+        self.info = info
+        
         filename = os.path.basename(folder).removeprefix(prefix).removesuffix(suffix)
         self.filename = filename
         if hasattr(self, 'name') is False:
             self.name = filename
+        
+        # self.siblings = []
+    # def find_similar(self, samples):
+    #     if hasattr(self, 'measurement') is False: return
+    #     for sample in samples:
+            
 
 def generate_samples():
     for folder in os.listdir(datafolder):
@@ -98,6 +109,19 @@ def generate_samples():
         yield sample.filename, sample
 unordered_samples = dict(generate_samples())
 samples = [unordered_samples[name] for name in filenames]
+
+# # measurement_numbers = {sample.measurement: sample if hasattr(sample, 'measurement') for sample in samples}
+# measurement_numbers = dict()
+# for sample in samples:
+#     if hasattr(sample, 'measurement') is False: continue
+#     measurement = sample.measurement
+#     if measurement not in measurement_numbers:
+#         measurement_numbers[measurement] = []
+#     measurement_numbers[measurement].append(sample)
+# for measurement_number, shared_samples in measurement_numbers.items():
+#     for sample in shared_samples:
+#         for other_sample in shared_samples:
+            
 
 
 num_of_plots = len(samples)
@@ -262,6 +286,7 @@ settings = Settings(OrderedDict({
     'BlueLaserPower': Setting('B', 'mW', column = 1, datatype = int, show_name = True),
     'Exposure': Setting('Exposure', 'dB', column = 2, datatype = int)}))
 
+# row_groups = []
 def generate_rows():
     for i, ax in enumerate(axs):
         row = []
@@ -320,7 +345,16 @@ def generate_rows():
                 for setting in column )
             row.append(content)
         
-        yield row
+        cell_kwargs = {'cellColours': ['w']*len(row)}
+        # if hasattr(sample, 'measurement'):
+        #     measurement = int(sample.measurement)
+        #     cell_kwargs['cellColours'] = [colors[measurement]]*len(row)
+        #     # info = sample.info            
+        #     # if info not in row_colors:
+        #     #     row_colors[info] = []
+        #     # row_colors[info].append((measurement, sample))
+
+        yield row, cell_kwargs
 
 table_width = 1
 margin = 0
@@ -329,22 +363,30 @@ edge = right_edge_figure + margin
 
 # column_names = ["Sample", "Power\n(mW)"]
 # column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
-column_names = ["Treatment\n1 (µM)", "4°C wait\n1 (h)", "Treatment\n2 (µM)", "4°C wait\n2 (h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(dB)"]
-column_widths = [0.15, 0.1, 0.15, 0.1, 0.15, 0.1, 0.1, 0.15]
+column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(dB)"]
+column_widths = [0.15, 0.07, 0.15, 0.07, 0.21, 0.1, 0.1, 0.15]
 assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
 
+rows, cell_kwargs = zip(*generate_rows())
+# print(cell_kwargs)
+cell_kwargs_merged = dict()
+for kwargs in cell_kwargs:
+    for key, value in kwargs.items():
+        if key not in cell_kwargs_merged: cell_kwargs_merged[key] = []
+        cell_kwargs_merged[key].append(value)
+# print(cell_kwargs_merged)
 table = plt.table(
-    tuple(generate_rows()),
+    rows,
     bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]),
     transform = transFigure,
-    cellLoc = 'left', colWidths = column_widths)
+    cellLoc = 'left', colWidths = column_widths, **cell_kwargs_merged)
 table.auto_set_font_size(False)
 table.set_fontsize(12)
 
 
 for i, name in enumerate(column_names):
     new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.1, text = name, loc = 'left')
-    new_cell.set_text_props(fontweight = 'bold', rotation = 45)
+    new_cell.set_text_props(fontweight = 'bold')#, rotation = 45)
 
 
 for cell in table.get_celld().values():
