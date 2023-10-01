@@ -60,13 +60,18 @@ filenames = [
 ]
 
 
+table_width = 1.5
+table_left_margin = 0
+minimum_table_right_margin = 0.05
 # column_names = ["Sample", "Power\n(mW)"]
 # column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
-column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)"]
-column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08]
-assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
-table_width = 1.5
-table_margin = 0
+# column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration\n(s)", "Number\nof\nvideos"]
+column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity"]
+# column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08]
+# column_widths = [0.07, 0.05, 0.07, 0.05, 0.12, 0.05, 0.07, 0.07, 0.08, 0.08, 0.08]
+column_widths = [0.07, 0.05, 0.07, 0.05, 0.12, 0.05, 0.07, 0.07, 0.08, 0.08]
+assert (width_sum := sum(column_widths)) <= (table_width - minimum_table_right_margin), f"Column widths sum to {width_sum} > (table_width - minimum_table_right_margin) = {(table_width - minimum_table_right_margin)}."
+
 
 
 class Sample():
@@ -336,7 +341,13 @@ settings = Settings(OrderedDict({
     'BlueLaserPower': Setting('B', 'mW', column = 0, datatype = int, show_name = True, depends_on = blue_enabled),
     'BlueLaserEnabled': blue_enabled,
     'Exposure': Setting('Exposure', 'ms', column = 1, datatype = int),
-    'Gain': Setting('Gain', 'dB', column = 2, datatype = int)}))
+    'Gain': Setting('Gain', 'dB', column = 2, datatype = int),
+    'FrameRate': Setting('Framerate', 'frames/sec', datatype = int),
+    'FramesPerVideo': Setting('Frames per video', 'frames', datatype = int),
+    'NumOfVideos': Setting('Number of videos', '', datatype = int),
+    'StirrerSpeed': Setting('Stirring speed', '', datatype = int),
+    'StirredTime': Setting('Stirred time', '', datatype = int)
+    }))
 
 def generate_rows():
     for i, ax in enumerate(axs):
@@ -393,12 +404,26 @@ def generate_rows():
                 setting.show_name*f"{setting.name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
                 for setting in column )
             row.append(content)
+        
+        framerate = settings.by_tag('FrameRate').get_value(sample)
+        frames_per_video = settings.by_tag('FramesPerVideo').get_value(sample)
+        video_duration = frames_per_video / framerate
+        if video_duration.is_integer():
+            video_duration = int(video_duration)
+        # row.append(video_duration)
+        
+        num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
+        # row.append(num_of_videos)
+        
+        row.append(f"{video_duration}x{num_of_videos}")
+        
+        
 
         yield row
 
 
 display_coords = final_ax.transData.transform([0, overall_min])
-edge = right_edge_figure + table_margin
+edge = right_edge_figure + table_left_margin
 
 table = plt.table(
     tuple(generate_rows()),
@@ -413,7 +438,7 @@ fig.add_artist(table)
 for i, name in enumerate(column_names):
     new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.1, text = name, loc = 'left')
     new_cell.set_text_props(fontweight = 'bold')
-margin_cell = table.add_cell(-1, len(column_names), width = 0.1, height = 0.1)
+margin_cell = table.add_cell(-1, len(column_names), width = table_width - width_sum, height = 0.1)
 for cell in table.get_celld().values():
     if cell is margin_cell:
         cell.set(edgecolor = None)
