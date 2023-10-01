@@ -47,7 +47,7 @@ x_lim = 250
 datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
-names = [
+filenames = [
     # "230709 1-100000 standard",
     # "230709 1-100000 standard #2",
     "230729 dilut L1-100 contr",
@@ -86,16 +86,18 @@ class Sample():
                 for line in info_file.readlines():
                     prop, value = line.split('=')
                     setattr(self, prop, value.strip())
+        filename = os.path.basename(folder).removeprefix(prefix).removesuffix(suffix)
+        self.filename = filename
         if hasattr(self, 'name') is False:
-            self.name = os.path.basename(folder).removeprefix(prefix).removesuffix(suffix)
+            self.name = filename
 
 def generate_samples():
     for folder in os.listdir(datafolder):
         sample = Sample(os.path.join(datafolder, folder))
-        if sample.name not in names: continue
-        yield sample.name, sample
+        if sample.name not in filenames: continue
+        yield sample.filename, sample
 unordered_samples = dict(generate_samples())
-samples = [unordered_samples[name] for name in names]
+samples = [unordered_samples[name] for name in filenames]
 
 
 num_of_plots = len(samples)
@@ -200,7 +202,7 @@ for i, tick_value in enumerate(tick_values):
         right_edge_figure = figure_x
     
 
-text_shift = 0.05
+text_shift = 0.1
 
 plt.text(0, 0.45 + text_shift, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
 
@@ -265,8 +267,43 @@ def generate_rows():
         row = []
         
         sample = samples[i]
-        name = sample.name
-        row.append(name)
+        
+        # name = sample.name
+        # row.append(name)
+        
+        if hasattr(sample, 'treatment'):
+            treatment1 = sample.treatment
+        elif hasattr(sample, 'treatment1'):
+            treatment1 = sample.treatment1
+        else:
+            treatment1 = None
+        row.append(treatment1)
+        if hasattr(sample, 'wait'):
+            wait1 = sample.wait
+        elif hasattr(sample, 'wait1'):
+            wait1 = sample.wait1
+        else:
+            wait1 = None
+        row.append(wait1)
+        
+        if hasattr(sample, 'treatment2'):
+            treatment2 = sample.treatment2
+        else:
+            treatment2 = None
+        row.append(treatment2)
+        if hasattr(sample, 'wait2'):
+            wait2 = sample.wait2
+        else:
+            wait2 = None
+        row.append(wait2)
+                
+        row.append(sample.experimental_unit)
+        
+        if hasattr(sample, 'filter'):
+            filter_used = sample.filter
+        else:
+            filter_used = None
+        row.append(filter_used)
                 
         with open(sample.xml) as xml_file:
             tree = ET.parse(xml_file)
@@ -292,8 +329,8 @@ edge = right_edge_figure + margin
 
 # column_names = ["Sample", "Power\n(mW)"]
 # column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
-column_names = ["Sample", "Power\n(mW)", "Exposure (dB)"]
-column_widths = [0.6, 0.2, 0.2]
+column_names = ["Treatment\n1 (µM)", "4°C wait\n1 (h)", "Treatment\n2 (µM)", "4°C wait\n2 (h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(dB)"]
+column_widths = [0.15, 0.1, 0.15, 0.1, 0.15, 0.1, 0.1, 0.15]
 assert 1 - (width_sum := sum(column_widths)) < 0.001, f"sum(column_widths) = {width_sum} != 1"
 
 table = plt.table(
@@ -306,8 +343,8 @@ table.set_fontsize(12)
 
 
 for i, name in enumerate(column_names):
-    new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.05, text = name, loc = 'left')
-    new_cell.set_text_props(fontweight = 'bold')
+    new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.1, text = name, loc = 'left')
+    new_cell.set_text_props(fontweight = 'bold', rotation = 45)
 
 
 for cell in table.get_celld().values():
