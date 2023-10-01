@@ -125,22 +125,6 @@ colors = cm.plasma(np.linspace(0, 1, num_of_plots))
 
 fig, axs = plt.subplots(num_of_plots, 1)
 fig.subplots_adjust(hspace=-0.05*height)
-
-# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-(table_width+table_margin), right=fig.subplotpars.right-(table_width+table_margin))
-# print(fig.subplotpars.left, fig.subplotpars.right)
-# print(fig.subplotpars.left-(table_width+table_margin+1))
-# print(fig.subplotpars.right-(table_width+table_margin+1))
-## fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-(table_width+table_margin+1), right=fig.subplotpars.right-(table_width+table_margin+1))
-# subplots_width = fig.subplotpars.right - fig.subplotpars.left
-# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-fig.subplotpars.right*(table_width+table_margin+1+0.2), right=fig.subplotpars.right-fig.subplotpars.right*(table_width+table_margin+1+0.2))
-# print(subplots_width)
-table_left_edge = fig.subplotpars.right
-print(table_left_edge)
-# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-table_left_edge*(table_width+table_margin+1+2), right=fig.subplotpars.right-table_left_edge*(table_width+table_margin+1+2))
-# subplots_width = fig.subplotpars.right - fig.subplotpars.left
-# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-subplots_width*(table_width+table_margin), right=fig.subplotpars.right-subplots_width*(table_width+table_margin))
-
-# plt.margins(1000) # wspace=width*(1+table_width+table_margin+2000)
 transFigure = fig.transFigure
 
 
@@ -252,15 +236,12 @@ for i, tick_value in enumerate(tick_values):
         right_edge, _ = display_coords
         right_edge_figure = figure_x
 
-print(right_edge_figure)
-
 
 text_shift = 0.05
 
 plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
 
 
-# text_y = 0.95 + text_shift
 text_y = 0 + text_shift
 
 plt.text(0, text_y, "Shadows show difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
@@ -287,6 +268,9 @@ plt.text(text_x, text_y, maxima_description, fontsize=12, transform = transFigur
 
 text_y -= 0.02
 plt.text(0, text_y, "Measured at room temperature.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+
+text_y -= 0.04
+plt.text(0, text_y, " ", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 
 axis_positions = [origin[1] for origin in origins]
@@ -428,54 +412,10 @@ fig.add_artist(table)
 
 for i, name in enumerate(column_names):
     new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.1, text = name, loc = 'left')
-    new_cell.set_text_props(fontweight = 'bold')#, rotation = 45)
-
-
+    new_cell.set_text_props(fontweight = 'bold')
+margin_cell = table.add_cell(-1, len(column_names), width = 0.1, height = 0.1)
 for cell in table.get_celld().values():
+    if cell is margin_cell:
+        cell.set(edgecolor = None)
+        continue
     cell.set(edgecolor = grid_color)
-
-# fig.subplots_adjust(hspace=-0.05*height, left = fig.subplotpars.left-(table_width+table_margin+1), right=fig.subplotpars.right-(table_width+table_margin+1))
-
-# width, height = fig.get_size_inches()
-# # height = min(np.floor(65536/resolution), height*1.1)
-# height *= 2
-# fig.set_size_inches(width, height)
-
-# fig.canvas.draw()
-# plt.tight_layout()
-
-# # Adapted from StackOverflow:
-# from copy import deepcopy
-# desired_sf = [2.0, 1.5]
-# x_scale, y_scale = 2, 1
-# old_width, old_height = deepcopy(fig.get_size_inches())
-# fig.set_size_inches([old_width * x_scale, old_height * y_scale], forward = True)
-# fig.canvas.draw()
-# new_width, new_height = fig.get_size_inches()
-# x_scale, y_scale = new_width/old_width, new_height/old_height
-# for subax in fig.axes:
-#     pos = subax.get_position()
-#     subax.set_position([pos.x0 / x_scale, pos.y0 / y_scale, pos.width / x_scale, pos.height / y_scale])
-# for text in fig.texts:
-#     pos = np.array(text.get_position())
-#     text.set_position(pos / (x_scale, y_scale))
-# for line in fig.lines:
-#     x = line.get_xdata()
-#     y = line.get_ydata()
-#     line.set_xdata(x / x_scale)
-#     line.set_ydata(y / y_scale)
-#     print(line)
-# for patch in fig.patches:
-#     xy = patch.get_xy()
-#     patch.set_xy(xy / (x_scale, y_scale))
-# for artist in fig.artists:
-#     print(type(artist))
-#     if type(artist) is plt.Line2D:
-#         line = artist
-#         x = line.get_xdata()
-#         y = line.get_ydata()
-#         line.set_xdata(x / x_scale)
-#         line.set_ydata(y / y_scale)
-#     elif type(artist) is plt.table.Table:
-#         table = artist
-# fig.canvas.draw()
