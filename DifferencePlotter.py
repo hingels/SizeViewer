@@ -12,10 +12,6 @@ import numpy as np
 import scipy
 from scipy.signal import argrelextrema
 from collections import OrderedDict
-
-from sample_class import Sample
-from settings_classes import Setting, Settings
-
 import matplotlib as mpl
 resolution = 200
 mpl.rcParams['figure.dpi'] = resolution
@@ -24,29 +20,16 @@ mpl.rcParams['axes.spines.left'] = False
 mpl.rcParams['axes.spines.right'] = False
 width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
+from sample_class import Sample
+from settings_classes import Setting, Settings
 
 
-cumulative_enabled = True
-
-grid_color = '0.8'
-rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}
-maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'}
-
-kernel_size = 30
-x = np.linspace(0, kernel_size, kernel_size)
-kernel_std = 4     # In units of bins
-kernel_center = kernel_size/2
-gaussian = np.exp(-np.power((x - kernel_center)/kernel_std, 2)/2)/(kernel_std * np.sqrt(2*np.pi))
-lowpass_filter = gaussian / gaussian.sum()
-filter_description = f"Black lines indicate Gaussian smoothing (a low-pass filter) with $\sigma = {kernel_std}$ bins and convolution kernel of size {kernel_size} bins."
-
-kernel2_size = 20
-second_derivative_threshold = -30
-maxima_candidate_description = f": Candidate peaks after smoothing, selected using argrelextrema in SciPy {scipy.__version__}."
-maxima_description = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of size {kernel2_size} bins."
+cumulative_enabled = False
+peaks_enabled = True
+difference_enabled = True
 
 x_lim = 250
-datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
+datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
 filenames = [
@@ -61,10 +44,27 @@ filenames = [
     "230729 KW+EW re-measure 4"
 ]
 table_width = 1.2
-table_left_margin = 0
+table_left_margin = 0 if difference_enabled else 0.02
 minimum_table_right_margin = 0.03
 column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity"]
 column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08, 0.16]
+
+kernel_size = 30
+x = np.linspace(0, kernel_size, kernel_size)
+kernel_std = 4     # In units of bins
+kernel_center = kernel_size/2
+gaussian = np.exp(-np.power((x - kernel_center)/kernel_std, 2)/2)/(kernel_std * np.sqrt(2*np.pi))
+lowpass_filter = gaussian / gaussian.sum()
+filter_description = f"Black lines indicate Gaussian smoothing (a low-pass filter) with $\sigma = {kernel_std}$ bins and convolution kernel of size {kernel_size} bins."
+
+kernel2_size = 20
+second_derivative_threshold = -30
+maxima_candidate_description = f": Candidate peaks after smoothing, selected using argrelextrema in SciPy {scipy.__version__}."
+maxima_description = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of size {kernel2_size} bins."
+
+grid_color = '0.8'
+rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}
+maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'}
 
 
 width_sum = sum(column_widths)
@@ -74,7 +74,6 @@ column_widths = np.append(column_widths, table_right_margin)
 column_names.append("")
 
                     
-
 def generate_samples():
     for folder in os.listdir(datafolder):
         sample = Sample(os.path.join(datafolder, folder), prefix, suffix)
@@ -82,7 +81,6 @@ def generate_samples():
         yield sample.filename, sample
 unordered_samples = dict(generate_samples())
 samples = [unordered_samples[name] for name in filenames]
-
 
 
 num_of_plots = len(samples)
@@ -116,23 +114,24 @@ for i, ax in enumerate(axs):
     plt.sca(ax)
     plt.bar(bins, sizes, width = width, color = colors[i], alpha = 0.7, align = 'center')
     
-    filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
-    plt.plot(bins, filtered, '-', color = 'black', linewidth = 0.5)
-    maxima_candidates, = argrelextrema(filtered, np.greater)
+    if peaks_enabled:
+        filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
+        plt.plot(bins, filtered, '-', color = 'black', linewidth = 0.5)
+        maxima_candidates, = argrelextrema(filtered, np.greater)
+        
+        twice_filtered = np.convolve(filtered, [1/kernel2_size]*kernel2_size, mode = 'same')
+        # plt.plot(bins, twice_filtered, linewidth = 0.5)
+        derivative = np.gradient(twice_filtered, bins)
+        second_derivative = np.gradient(derivative, bins)
+        # plt.plot(bins, second_derivative*100, linewidth = 0.5)
+        second_deriv_negative, = np.where(second_derivative < second_derivative_threshold)
     
-    twice_filtered = np.convolve(filtered, [1/kernel2_size]*kernel2_size, mode = 'same')
-    # plt.plot(bins, twice_filtered, linewidth = 0.5)
-    derivative = np.gradient(twice_filtered, bins)
-    second_derivative = np.gradient(derivative, bins)
-    # plt.plot(bins, second_derivative*100, linewidth = 0.5)
-    second_deriv_negative, = np.where(second_derivative < second_derivative_threshold)
-
-    maxima = np.array([index for index in maxima_candidates if index in second_deriv_negative])
-    assert len(maxima) != 0, 'No peaks found. The second derivative threshold may be too high.'
-    
-    rejected_candidates = np.array([entry for entry in maxima_candidates if entry not in maxima])
-    plt.plot(bins[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
-    plt.plot(bins[maxima], filtered[maxima], **maxima_marker)
+        maxima = np.array([index for index in maxima_candidates if index in second_deriv_negative])
+        assert len(maxima) != 0, 'No peaks found. The second derivative threshold may be too high.'
+        
+        rejected_candidates = np.array([entry for entry in maxima_candidates if entry not in maxima])
+        plt.plot(bins[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
+        plt.plot(bins[maxima], filtered[maxima], **maxima_marker)
     
     
     if cumulative_enabled:
@@ -140,7 +139,7 @@ for i, ax in enumerate(axs):
         
     
     overall_max = max(sizes.max(), overall_max)
-    if previous_sizes is not None:
+    if previous_sizes is not None and difference_enabled:
         size_differences = sizes - previous_sizes
         overall_max = max(size_differences.max(), overall_max)
         overall_min = min(size_differences.min(), overall_min)
@@ -175,6 +174,7 @@ for i, ax in enumerate(axs):
     plt.ylim(overall_min, overall_max)
     if i == final_i:
         plt.axhline(0, color = 'black')
+        
     else:
         ax.spines['bottom'].set_position(('data', 0))
     origin_transDisplay = ax.transData.transform([0, 0])
@@ -215,10 +215,12 @@ plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, tran
 
 text_y = 0 + text_shift
 
-plt.text(0, text_y, "Shadows show difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+if difference_enabled:
+    plt.text(0, text_y, "Shadows show difference between a plot and the one above it.", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
-text_y -= 0.02
-plt.text(0, text_y, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+if peaks_enabled:
+    text_y -= 0.02
+    plt.text(0, text_y, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 if cumulative_enabled:
     text_y -= 0.02
@@ -228,15 +230,16 @@ if cumulative_enabled:
 icon_x = 0.01
 text_x = 0.02
 
-text_y -= 0.02
-rejected_maxima_icon, = plt.plot([icon_x], [text_y], **rejected_maxima_marker, transform = transFigure)
-rejected_maxima_icon.set_clip_on(False)
-plt.text(text_x, text_y, maxima_candidate_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
-
-text_y -= 0.02
-maxima_icon, = plt.plot([icon_x], [text_y], **maxima_marker, transform = transFigure)
-maxima_icon.set_clip_on(False)
-plt.text(text_x, text_y, maxima_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+if peaks_enabled:
+    text_y -= 0.02
+    rejected_maxima_icon, = plt.plot([icon_x], [text_y], **rejected_maxima_marker, transform = transFigure)
+    rejected_maxima_icon.set_clip_on(False)
+    plt.text(text_x, text_y, maxima_candidate_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
+    
+    text_y -= 0.02
+    maxima_icon, = plt.plot([icon_x], [text_y], **maxima_marker, transform = transFigure)
+    maxima_icon.set_clip_on(False)
+    plt.text(text_x, text_y, maxima_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 text_y -= 0.02
 plt.text(0, text_y, "Measured at room temperature.", fontsize=12, transform = transFigure, verticalalignment = 'center')
@@ -249,7 +252,6 @@ axis_positions = [origin[1] for origin in origins]
 cell_height = axis_positions[0] - axis_positions[1]
 table_top = axis_positions[0] + 0.5*cell_height
 table_bottom = axis_positions[-1] - 0.5*cell_height
-
 
 
 red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
