@@ -7,7 +7,6 @@ Created on Wed Sep 27 11:52:38 2023
 """
 
 import os
-import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
 import scipy
@@ -26,11 +25,12 @@ mpl.rcParams['axes.spines.right'] = False
 width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
 
-grid_color = '0.8'
 
+cumulative_enabled = True
+
+grid_color = '0.8'
 rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}
 maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'}
-
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -44,7 +44,6 @@ kernel2_size = 20
 second_derivative_threshold = -30
 maxima_candidate_description = f": Candidate peaks after smoothing, selected using argrelextrema in SciPy {scipy.__version__}."
 maxima_description = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of size {kernel2_size} bins."
-
 
 x_lim = 250
 datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
@@ -61,18 +60,19 @@ filenames = [
     "230729 KW+EW re-measure 3",
     "230729 KW+EW re-measure 4"
 ]
-
-
 table_width = 1.2
 table_left_margin = 0
 minimum_table_right_margin = 0.03
 column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity"]
 column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08, 0.16]
+
+
 width_sum = sum(column_widths)
 table_right_margin = table_width - width_sum
 assert table_right_margin >= minimum_table_right_margin, f"table_right_margin = {table_right_margin} < minimum_table_right_margin = {minimum_table_right_margin}."
 column_widths = np.append(column_widths, table_right_margin)
 column_names.append("")
+
                     
 
 def generate_samples():
@@ -135,7 +135,8 @@ for i, ax in enumerate(axs):
     plt.plot(bins[maxima], filtered[maxima], **maxima_marker)
     
     
-    cumulative_sums.append(np.cumsum(sizes))    
+    if cumulative_enabled:
+        cumulative_sums.append(np.cumsum(sizes))    
         
     
     overall_max = max(sizes.max(), overall_max)
@@ -160,11 +161,12 @@ for i, ax in enumerate(axs):
     previous_sizes = sizes
     
 
-max_of_cumulative_sums = 0
-for cumulative_sum in cumulative_sums:
-    this_max = max(cumulative_sum)
-    max_of_cumulative_sums = max(max_of_cumulative_sums, this_max)
-cumulative_sum_scaling = overall_max / max_of_cumulative_sums
+if cumulative_enabled:
+    max_of_cumulative_sums = 0
+    for cumulative_sum in cumulative_sums:
+        this_max = max(cumulative_sum)
+        max_of_cumulative_sums = max(max_of_cumulative_sums, this_max)
+    cumulative_sum_scaling = overall_max / max_of_cumulative_sums
 
 
 origins = []
@@ -178,8 +180,9 @@ for i, ax in enumerate(axs):
     origin_transDisplay = ax.transData.transform([0, 0])
     origins.append(transFigure.inverted().transform(origin_transDisplay))
     
-    cumulative_sum = cumulative_sums[i]
-    plt.plot(bins, cumulative_sum*cumulative_sum_scaling, color = 'red', linewidth = 0.5)
+    if cumulative_enabled:
+        cumulative_sum = cumulative_sums[i]
+        plt.plot(bins, cumulative_sum*cumulative_sum_scaling, color = 'red', linewidth = 0.5)
 
 final_ax = ax   # Using the ax from the final (bottom) plot:
 final_ax.xaxis.set_tick_params(width = 2)
@@ -217,8 +220,9 @@ plt.text(0, text_y, "Shadows show difference between a plot and the one above it
 text_y -= 0.02
 plt.text(0, text_y, filter_description, fontsize=12, transform = transFigure, verticalalignment = 'center')
 
-text_y -= 0.02
-plt.text(0, text_y, f"Red lines are cumulative sums of unsmoothed data, scaled by {cumulative_sum_scaling:.3}.", fontsize=12, transform = transFigure, verticalalignment = 'center')
+if cumulative_enabled:
+    text_y -= 0.02
+    plt.text(0, text_y, f"Red lines are cumulative sums of unsmoothed data, scaled by {cumulative_sum_scaling:.3}.", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
 
 icon_x = 0.01
@@ -252,33 +256,36 @@ red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
 green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
 blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
 xml_settings = [
-    Setting('RedLaserPower', name = 'R', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = red_enabled),
+    Setting('RedLaserPower', name = 'R', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = red_enabled),
     red_enabled,
-    Setting('GreenLaserPower', name = 'G', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = green_enabled),
+    Setting('GreenLaserPower', name = 'G', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = green_enabled),
     green_enabled,
-    Setting('BlueLaserPower', name = 'B', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = blue_enabled),
+    Setting('BlueLaserPower', name = 'B', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = blue_enabled),
     blue_enabled,
-    Setting('Exposure', units = 'ms', column = 1, datatype = int),
-    Setting('Gain', units = 'dB', column = 2, datatype = int),
+    Setting('Exposure', units = 'ms', column = 3, datatype = int),
+    Setting('Gain', units = 'dB', column = 4, datatype = int),
     Setting('FrameRate', name = 'Framerate', units = 'frames/sec', datatype = int),
     Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
     Setting('NumOfVideos', name = 'Number of videos', datatype = int),
     Setting('StirrerSpeed', name = 'Stirring speed', datatype = int),
     Setting('StirredTime', name = 'Stirred time', datatype = int) ]
 md_settings = [
+    Setting('experimental_unit', column = 0),
     Setting('treatment'),
     Setting('wait'),
-    Setting('filter') ]
+    Setting('filter', column = 1) ]
 settings_list = [*xml_settings, *md_settings]
 settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
 
 def generate_rows():
-    max_num_treatments = 0
-    treatments_list = []
-    max_num_waits = 0
-    waits_list = []
+    column_quantities = dict()
+    def number_of_values(tag, sample):
+        if (setting := settings.by_tag(tag)) is None or (value := setting.get_value(sample)) is None:
+            return 0
+        if type(value) is list:
+            return len(value)
+        return 1
     def get_multivalued(tag, sample):
-        # if (setting := settings.by_tag('treatment')) and (value := setting.get_value(sample)):
         if (setting := settings.by_tag(tag)) is None or (value := setting.get_value(sample)) is None:
             return [None]
         if type(value) is list:
@@ -290,114 +297,34 @@ def generate_rows():
     for i in range(num_of_plots):
         sample = samples[i]
         
-        with open(sample.xml) as xml_file:
-            tree = ET.parse(xml_file)
-            root = tree.getroot()
-            for entry in root.find('RecordingSettings'):
-                tag = entry.tag
-                if tag in settings.tags:
-                    setting = settings.by_tag(tag)
-                    setting.set_value(sample, entry.text)
-        with open(sample.info) as info_file:
-            for line in info_file.readlines():
-                tag, value = line.split('=')
-                value = value.strip()
-                tag = tag.split('.')
-                is_multivalued = (len(tag) != 1)
-                tag_base = tag[0]
-                if tag_base in settings.tags:
-                    setting = settings.by_tag(tag_base)
-                    if is_multivalued is False:
-                        setting.set_value(sample, value)
-                        continue
-                    assert len(tag) == 2
-                    value_index = tag[1]
-                    assert value_index.isdigit() and float(value_index).is_integer()
-                    value_index = int(value_index)
-                    if sample in setting.sample_values:
-                        current_value = setting.get_value(sample)
-                        if type(current_value) is not list:
-                            current_value = [(1, current_value)]
-                        current_value.append((value_index, value))
-                    else:
-                        current_value = [(1, value)]
-                    setting.set_value(sample, current_value, datatype = list)
-        settings.apply_dependencies()
+        settings.read_files(sample)
         
-        treatments = get_multivalued('treatment', sample)
-        treatments_list.append(treatments)
-        waits = get_multivalued('wait', sample)
-        waits_list.append(waits)
-        num_waits = len(waits)
-        num_treatments = len(treatments)
-        assert num_waits <= num_treatments
-        max_num_waits = max(max_num_waits, num_waits)
-        max_num_treatments = max(max_num_treatments, num_treatments)
-        # for i in range(num_treatments):
-        #     row.append(treatments[i])
-        #     if i < num_waits:
-        #         row.append(waits[i])
+        for tag in ('treatment', 'wait'):
+            quantity = number_of_values(tag, sample)
+            if tag not in column_quantities:
+                column_quantities[tag] = quantity
+                continue
+            column_quantities[tag] = max(column_quantities[tag], quantity)
+        
     for i, ax in enumerate(axs):
         row = []
         
         sample = samples[i]
                 
-        treatments = treatments_list[i]
-        waits = waits_list[i]
-        for i in range(max_num_treatments):
-            if i < len(treatments): row.append(treatments[i])
+        treatments = get_multivalued('treatment', sample)
+        waits = get_multivalued('wait', sample)
+        for j in range( max(column_quantities['treatment'], column_quantities['wait']) ):
+            if j < len(treatments): row.append(treatments[j])
             else: row.append(None)
-            if i < len(waits): row.append(waits[i])
+            if j < len(waits): row.append(waits[j])
             else: row.append(None)
-        
-        # row.append(sample.experimental_unit)
-        
-        # if hasattr(sample, 'filter'):
-        #     filter_used = sample.filter
-        # else:
-        #     filter_used = None
-        # row.append(filter_used)
-        
-        
                     
-        # if hasattr(sample, 'treatment'):
-        #     treatment1 = sample.treatment
-        # elif hasattr(sample, 'treatment1'):
-        #     treatment1 = sample.treatment1
-        # else:
-        #     treatment1 = None
-        # row.append(treatment1)
-        # if hasattr(sample, 'wait'):
-        #     wait1 = sample.wait
-        # elif hasattr(sample, 'wait1'):
-        #     wait1 = sample.wait1
-        # else:
-        #     wait1 = None
-        # row.append(wait1)
-        
-        # if hasattr(sample, 'treatment2'):
-        #     treatment2 = sample.treatment2
-        # else:
-        #     treatment2 = None
-        # row.append(treatment2)
-        # if hasattr(sample, 'wait2'):
-        #     wait2 = sample.wait2
-        # else:
-        #     wait2 = None
-        # row.append(wait2)
-                
-        # row.append(sample.experimental_unit)
-        
-        # if hasattr(sample, 'filter'):
-        #     filter_used = sample.filter
-        # else:
-        #     filter_used = None
-        # row.append(filter_used)
-                    
-        for column in settings.columns:
+        columns = list(settings.columns.items())
+        columns.sort()
+        for j, column in columns:
             content = '\n'.join(
                 setting.show_name*f"{setting.name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
-                for setting in column )
+                for setting in column if setting.get_value(sample) is not None )
             row.append(content)
         
         framerate = settings.by_tag('FrameRate').get_value(sample)
