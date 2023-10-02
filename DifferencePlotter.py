@@ -66,16 +66,10 @@ filenames = [
 table_width = 1.2
 table_left_margin = 0
 minimum_table_right_margin = 0.03
-# column_names = ["Sample", "Power\n(mW)"]
-# column_names = ["Sample", "Power\n(mW)", "Filter cutoff (nm)"]
-# column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration\n(s)", "Number\nof\nvideos"]
 column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity"]
 column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08, 0.16]
-# column_widths = [0.07, 0.05, 0.07, 0.05, 0.12, 0.05, 0.07, 0.07, 0.08, 0.08, 0.08]
-# column_widths = np.array([0.07, 0.05, 0.07, 0.05, 0.12, 0.05, 0.07, 0.07, 0.08, 0.08])/table_width
 width_sum = sum(column_widths)
 table_right_margin = table_width - width_sum
-# assert width_sum <= (table_width - minimum_table_right_margin), f"Column widths sum to {width_sum} > (table_width - minimum_table_right_margin) = {(table_width - minimum_table_right_margin)}."
 assert table_right_margin >= minimum_table_right_margin, f"table_right_margin = {table_right_margin} < minimum_table_right_margin = {minimum_table_right_margin}."
 column_widths = np.append(column_widths, table_right_margin)
 column_names.append("")
@@ -255,24 +249,24 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
 
-red_enabled = Setting('Red enabled', '', datatype = bool)
-green_enabled = Setting('Green enabled', '', datatype = bool)
-blue_enabled = Setting('Blue enabled', '', datatype = bool)
-settings = Settings(OrderedDict({
-    'RedLaserPower': Setting('R', 'mW', column = 0, datatype = int, show_name = True, depends_on = red_enabled),
-    'RedLaserEnabled': red_enabled,
-    'GreenLaserPower': Setting('G', 'mW', column = 0, datatype = int, show_name = True, depends_on = green_enabled),
-    'GreenLaserEnabled': green_enabled,
-    'BlueLaserPower': Setting('B', 'mW', column = 0, datatype = int, show_name = True, depends_on = blue_enabled),
-    'BlueLaserEnabled': blue_enabled,
-    'Exposure': Setting('Exposure', 'ms', column = 1, datatype = int),
-    'Gain': Setting('Gain', 'dB', column = 2, datatype = int),
-    'FrameRate': Setting('Framerate', 'frames/sec', datatype = int),
-    'FramesPerVideo': Setting('Frames per video', 'frames', datatype = int),
-    'NumOfVideos': Setting('Number of videos', '', datatype = int),
-    'StirrerSpeed': Setting('Stirring speed', '', datatype = int),
-    'StirredTime': Setting('Stirred time', '', datatype = int)
-    }))
+red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
+green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
+blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
+settings_list = [
+    Setting('RedLaserPower', name = 'R', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = red_enabled),
+    red_enabled,
+    Setting('GreenLaserPower', name = 'G', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = green_enabled),
+    green_enabled,
+    Setting('BlueLaserPower', name = 'B', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = blue_enabled),
+    blue_enabled,
+    Setting('Exposure', units = 'ms', column = 1, datatype = int),
+    Setting('Gain', units = 'dB', column = 2, datatype = int),
+    Setting('FrameRate', name = 'Framerate', units = 'frames/sec', datatype = int),
+    Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
+    Setting('NumOfVideos', name = 'Number of videos', datatype = int),
+    Setting('StirrerSpeed', name = 'Stirring speed', datatype = int),
+    Setting('StirredTime', name = 'Stirred time', datatype = int) ]
+settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
 
 def generate_rows():
     for i, ax in enumerate(axs):
@@ -359,10 +353,8 @@ fig.add_artist(table)
 for i, name in enumerate(column_names):
     new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.1, text = name, loc = 'left')
     new_cell.set_text_props(fontweight = 'bold')
-# margin_cell = table.add_cell(-1, len(column_names), width = table_width - width_sum, height = 0.1)
 final_column = len(column_widths) - 1
 for (row, column), cell in table.get_celld().items():
-    # if cell is margin_cell:
     if column == final_column:
         cell.set(edgecolor = None)
         continue

@@ -9,7 +9,9 @@ Created on Sun Oct  1 17:08:22 2023
 from sample_class import Sample
 
 class Setting():
-    def __init__(self, name, units, column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None):
+    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None):
+        self.tag = tag
+        if name is None: name = tag
         self.name = name
         self.units = units
         self.column = column
@@ -28,7 +30,9 @@ class Setting():
     def get_value(self, sample: Sample):
         return self.sample_values[sample]
 class Settings():
-    def __init__(self, settings_dict):
+    def __init__(self, settings_dict = None):
+        if settings_dict is None:
+            settings_dict = dict()
         self.tags = settings_dict
         columns = []
         for setting in settings_dict.values():
@@ -40,6 +44,17 @@ class Settings():
         self.columns = columns
     def by_tag(self, tag):
         return self.tags[tag]
+    def add_setting(self, tag, setting):
+        tags = self.tags
+        assert tag not in tags
+        tags[tag] = setting
+        
+        columns = self.columns
+        column = setting.column
+        if column is None: return
+        if column > (len(columns) - 1):
+            columns.append([])
+        columns[column].append(setting)
     def apply_dependencies(self):
         '''
         For any setting that is dependent on another setting, set it to zero (or equivalent) if the dependency has a value of False.
