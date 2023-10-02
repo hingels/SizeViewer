@@ -24,11 +24,14 @@ class Setting():
         self.show_name = show_name
         self.datatype = datatype
         self.depends_on = depends_on
-    def set_value(self, sample: Sample, value):
-        datatype = self.datatype
+    def set_value(self, sample: Sample, value, datatype = None):
+        if datatype is None:
+            datatype = self.datatype
         self.sample_values[sample] = datatype(value) if datatype is not bool else value.lower() == "true"
     def get_value(self, sample: Sample):
-        return self.sample_values[sample]
+        sample_values = self.sample_values
+        if sample not in sample_values: return None
+        return sample_values[sample]
 class Settings():
     def __init__(self, settings_dict = None):
         if settings_dict is None:
@@ -43,7 +46,9 @@ class Settings():
             columns[column].append(setting)
         self.columns = columns
     def by_tag(self, tag):
-        return self.tags[tag]
+        tags = self.tags
+        if tag not in tags: return None
+        return tags[tag]
     def add_setting(self, tag, setting):
         tags = self.tags
         assert tag not in tags

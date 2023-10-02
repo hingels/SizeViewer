@@ -163,8 +163,7 @@ for i, ax in enumerate(axs):
 max_of_cumulative_sums = 0
 for cumulative_sum in cumulative_sums:
     this_max = max(cumulative_sum)
-    if this_max > max_of_cumulative_sums:
-        max_of_cumulative_sums = this_max
+    max_of_cumulative_sums = max(max_of_cumulative_sums, this_max)
 cumulative_sum_scaling = overall_max / max_of_cumulative_sums
 
 
@@ -252,7 +251,7 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
 green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
 blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
-settings_list = [
+xml_settings = [
     Setting('RedLaserPower', name = 'R', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = red_enabled),
     red_enabled,
     Setting('GreenLaserPower', name = 'G', units = 'mW', column = 0, datatype = int, show_name = True, depends_on = green_enabled),
@@ -266,48 +265,31 @@ settings_list = [
     Setting('NumOfVideos', name = 'Number of videos', datatype = int),
     Setting('StirrerSpeed', name = 'Stirring speed', datatype = int),
     Setting('StirredTime', name = 'Stirred time', datatype = int) ]
+md_settings = [
+    Setting('treatment'),
+    Setting('wait'),
+    Setting('filter') ]
+settings_list = [*xml_settings, *md_settings]
 settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
 
 def generate_rows():
-    for i, ax in enumerate(axs):
-        row = []
-        
+    max_num_treatments = 0
+    treatments_list = []
+    max_num_waits = 0
+    waits_list = []
+    def get_multivalued(tag, sample):
+        # if (setting := settings.by_tag('treatment')) and (value := setting.get_value(sample)):
+        if (setting := settings.by_tag(tag)) is None or (value := setting.get_value(sample)) is None:
+            return [None]
+        if type(value) is list:
+            value.sort()
+            value = [subvalue for index, subvalue in value]
+        else:
+            value = [value]
+        return value
+    for i in range(num_of_plots):
         sample = samples[i]
         
-        if hasattr(sample, 'treatment'):
-            treatment1 = sample.treatment
-        elif hasattr(sample, 'treatment1'):
-            treatment1 = sample.treatment1
-        else:
-            treatment1 = None
-        row.append(treatment1)
-        if hasattr(sample, 'wait'):
-            wait1 = sample.wait
-        elif hasattr(sample, 'wait1'):
-            wait1 = sample.wait1
-        else:
-            wait1 = None
-        row.append(wait1)
-        
-        if hasattr(sample, 'treatment2'):
-            treatment2 = sample.treatment2
-        else:
-            treatment2 = None
-        row.append(treatment2)
-        if hasattr(sample, 'wait2'):
-            wait2 = sample.wait2
-        else:
-            wait2 = None
-        row.append(wait2)
-                
-        row.append(sample.experimental_unit)
-        
-        if hasattr(sample, 'filter'):
-            filter_used = sample.filter
-        else:
-            filter_used = None
-        row.append(filter_used)
-                
         with open(sample.xml) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
@@ -316,7 +298,101 @@ def generate_rows():
                 if tag in settings.tags:
                     setting = settings.by_tag(tag)
                     setting.set_value(sample, entry.text)
+        with open(sample.info) as info_file:
+            for line in info_file.readlines():
+                tag, value = line.split('=')
+                value = value.strip()
+                tag = tag.split('.')
+                is_multivalued = (len(tag) != 1)
+                tag_base = tag[0]
+                if tag_base in settings.tags:
+                    setting = settings.by_tag(tag_base)
+                    if is_multivalued is False:
+                        setting.set_value(sample, value)
+                        continue
+                    assert len(tag) == 2
+                    value_index = tag[1]
+                    assert value_index.isdigit() and float(value_index).is_integer()
+                    value_index = int(value_index)
+                    if sample in setting.sample_values:
+                        current_value = setting.get_value(sample)
+                        if type(current_value) is not list:
+                            current_value = [(1, current_value)]
+                        current_value.append((value_index, value))
+                    else:
+                        current_value = [(1, value)]
+                    setting.set_value(sample, current_value, datatype = list)
         settings.apply_dependencies()
+        
+        treatments = get_multivalued('treatment', sample)
+        treatments_list.append(treatments)
+        waits = get_multivalued('wait', sample)
+        waits_list.append(waits)
+        num_waits = len(waits)
+        num_treatments = len(treatments)
+        assert num_waits <= num_treatments
+        max_num_waits = max(max_num_waits, num_waits)
+        max_num_treatments = max(max_num_treatments, num_treatments)
+        # for i in range(num_treatments):
+        #     row.append(treatments[i])
+        #     if i < num_waits:
+        #         row.append(waits[i])
+    for i, ax in enumerate(axs):
+        row = []
+        
+        sample = samples[i]
+                
+        treatments = treatments_list[i]
+        waits = waits_list[i]
+        for i in range(max_num_treatments):
+            if i < len(treatments): row.append(treatments[i])
+            else: row.append(None)
+            if i < len(waits): row.append(waits[i])
+            else: row.append(None)
+        
+        # row.append(sample.experimental_unit)
+        
+        # if hasattr(sample, 'filter'):
+        #     filter_used = sample.filter
+        # else:
+        #     filter_used = None
+        # row.append(filter_used)
+        
+        
+                    
+        # if hasattr(sample, 'treatment'):
+        #     treatment1 = sample.treatment
+        # elif hasattr(sample, 'treatment1'):
+        #     treatment1 = sample.treatment1
+        # else:
+        #     treatment1 = None
+        # row.append(treatment1)
+        # if hasattr(sample, 'wait'):
+        #     wait1 = sample.wait
+        # elif hasattr(sample, 'wait1'):
+        #     wait1 = sample.wait1
+        # else:
+        #     wait1 = None
+        # row.append(wait1)
+        
+        # if hasattr(sample, 'treatment2'):
+        #     treatment2 = sample.treatment2
+        # else:
+        #     treatment2 = None
+        # row.append(treatment2)
+        # if hasattr(sample, 'wait2'):
+        #     wait2 = sample.wait2
+        # else:
+        #     wait2 = None
+        # row.append(wait2)
+                
+        # row.append(sample.experimental_unit)
+        
+        # if hasattr(sample, 'filter'):
+        #     filter_used = sample.filter
+        # else:
+        #     filter_used = None
+        # row.append(filter_used)
                     
         for column in settings.columns:
             content = '\n'.join(
