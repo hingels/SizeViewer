@@ -70,14 +70,17 @@ for tag, dependency_tag in dependencies.items():
 
 for sample in samples:
     settings.read_files(sample, get_all = True, dependencies = dependencies)
+    settings.parse_time(sample)
 
 
 os.makedirs(output_folder, exist_ok = True)
 
 def generate_setting_objects():
     for tag, setting in settings.tags.items():
-        yield tag, setting
+        if setting.hidden is False:
+            yield tag, setting
         for subtag, subsetting in setting.subsettings.items():
+            if subsetting.hidden: continue
             yield f"{tag}.{subtag}", subsetting
 # all_tags, setting_objects = zip(*settings.tags.items())
 all_tags, setting_objects = zip(*generate_setting_objects())

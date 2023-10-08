@@ -44,12 +44,12 @@ filenames = [
     "230729 KW+EW re-measure 4"#,
     # "230701a, pre+96h fluor +DiO+Triton"
 ]
-table_width = 1.4
+table_width = 1.6
 # table_left_margin = 0 if difference_enabled else 0.02
 table_left_margin = 0.02
 minimum_table_right_margin = 0.03
-column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity"]
-column_widths = [0.2, 0.07, 0.2, 0.07, 0.19, 0.14, 0.1, 0.13, 0.08, 0.16]
+column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", "Time after\nprevious (s)"]
+column_widths = [0.2, 0.07, 0.2, 0.07, 0.19, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16]
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -306,6 +306,7 @@ def generate_rows():
         sample = samples[i]
         
         settings.read_files(sample)
+        settings.parse_time(sample)
         
         for tag in ('treatment', 'wait'):
             quantity = number_of_subtags(tag)
@@ -314,6 +315,7 @@ def generate_rows():
                 continue
             column_quantities[tag] = max(column_quantities[tag], quantity)
         
+    previous_time = None
     for i, ax in enumerate(axs):
         row = []
         
@@ -332,9 +334,9 @@ def generate_rows():
         if experimental_unit is not None:
             value = experimental_unit.get_value(sample)
             text += value if value is not None else ''
-            if hasattr(experimental_unit, 'date'):
-                date = experimental_unit.date.get_value(sample)
-                text += f'\n{date}' if date is not None else ''
+            if hasattr(experimental_unit, 'age'):
+                age = experimental_unit.age.get_value(sample)
+                text += f'\n{age}' if age is not None else ''
         row.append(text)        
         # experimental_unit_subtags = number_of_subtags('experimental_unit', sample)
         # # experimental_unit = get_multivalued('experimental_unit', sample)
@@ -358,6 +360,13 @@ def generate_rows():
             video_duration = int(video_duration)        
         num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
         row.append(f"{video_duration}x{num_of_videos}")
+        
+        time = settings.by_tag('time').get_value(sample)
+        if previous_time is None:
+            row.append(None)
+        else:
+            row.append(int((time - previous_time).total_seconds()))
+        previous_time = time
         
         row.append("")
         

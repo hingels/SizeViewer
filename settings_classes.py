@@ -9,9 +9,10 @@ Created on Sun Oct  1 17:08:22 2023
 from sample_class import Sample
 import typing
 import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta
 
 class Setting():
-    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None):
+    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False):
         self.tag = tag
         if name is None: name = tag
         self.name = name
@@ -32,6 +33,8 @@ class Setting():
         self.show_name = show_name
         self.datatype = datatype
         self.depends_on = depends_on
+
+        self.hidden = hidden
     def add_subsetting(self, subsetting, subtag):
         self.subsettings[subtag] = subsetting
         if type(subtag) is int:
@@ -47,6 +50,12 @@ class Setting():
             converted_value = None
         elif datatype is bool:
             converted_value = (value.lower() == 'true')
+        elif datatype is datetime:
+            assert type(value) is datetime
+            converted_value = value
+        elif datatype is timedelta:
+            assert type(value) is timedelta
+            converted_value = value
         else:
             converted_value = datatype(value)
         
@@ -89,6 +98,26 @@ class Settings():
             for sample, value in setting.sample_values.items():
                 if depends_on.get_value(sample) is False:
                     setting.set_value(sample, setting.datatype(0))
+    def parse_time(self, sample):
+        if 'MeasurementStartDateTime' not in self.tags: return
+        measurement_time = datetime.strptime(self.by_tag('MeasurementStartDateTime').get_value(sample), '%Y-%m-%d %H:%M:%S')
+        # sample.set_time(measurement_time)
+        if 'time' not in self.tags:
+            time_setting = Setting('time', hidden = True)
+            self.add_setting('time', time_setting)
+        self.by_tag('time').set_value(sample, measurement_time, datatype = datetime)
+        
+        if 'experimental_unit' not in self.tags: return
+        experimental_unit = self.by_tag('experimental_unit')
+        if hasattr(experimental_unit, 'date') is False: return
+        experimental_unit_date = datetime.strptime(experimental_unit.date.get_value(sample), '%Y/%m/%d')
+        age = (measurement_time - experimental_unit_date).total_seconds() / 86400
+        
+        if hasattr(experimental_unit, 'age') is False:
+            age_subsetting = Setting('age')
+            experimental_unit.add_subsetting(age_subsetting, 'age')
+        # sample.set_age(f"{age:.1f} days old")
+        experimental_unit.age.set_value(sample, f"{age:.1f} d old")
     def read_files(self, sample: Sample, get_all = False, dependencies: dict = None):
         if dependencies is None: dependencies = dict()
         tags = self.tags
