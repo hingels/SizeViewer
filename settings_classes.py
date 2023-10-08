@@ -101,7 +101,6 @@ class Settings():
     def parse_time(self, sample):
         if 'MeasurementStartDateTime' not in self.tags: return
         measurement_time = datetime.strptime(self.by_tag('MeasurementStartDateTime').get_value(sample), '%Y-%m-%d %H:%M:%S')
-        # sample.set_time(measurement_time)
         if 'time' not in self.tags:
             time_setting = Setting('time', hidden = True)
             self.add_setting('time', time_setting)
@@ -116,7 +115,6 @@ class Settings():
         if hasattr(experimental_unit, 'age') is False:
             age_subsetting = Setting('age')
             experimental_unit.add_subsetting(age_subsetting, 'age')
-        # sample.set_age(f"{age:.1f} days old")
         experimental_unit.age.set_value(sample, f"{age:.1f} d old")
     def read_files(self, sample: Sample, get_all = False, dependencies: dict = None):
         if dependencies is None: dependencies = dict()

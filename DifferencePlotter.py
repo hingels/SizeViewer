@@ -44,12 +44,12 @@ filenames = [
     "230729 KW+EW re-measure 4"#,
     # "230701a, pre+96h fluor +DiO+Triton"
 ]
-table_width = 1.6
+table_width = 2
 # table_left_margin = 0 if difference_enabled else 0.02
 table_left_margin = 0.02
 minimum_table_right_margin = 0.03
-column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", "Time after\nprevious (s)"]
-column_widths = [0.2, 0.07, 0.2, 0.07, 0.19, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16]
+column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", "Time after\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
+column_widths = [0.2, 0.07, 0.2, 0.07, 0.19, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -100,13 +100,20 @@ transFigure = fig.transFigure
 final_i = num_of_plots - 1
 overall_min, overall_max = 0, 0
 cumulative_sums = []
+sums = []
 bins = None
 previous_sizes = None
 for i, ax in enumerate(axs):
     sample = samples[i]
     
-    data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python').iloc[:400, :]
+    full_data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
+    data = full_data.iloc[:400, :]
     new_bins = data['CenterBinDiameter_[nm]']
+    
+    top_nm = max(data['UpperBinDiameter_[nm]'])
+    if top_nm.is_integer():
+        top_nm = int(top_nm)
+    
     if bins is not None:
         assert np.all(new_bins == bins) == True, 'Unequal sequence of bins between samples detected!'
     bins = new_bins
@@ -138,8 +145,12 @@ for i, ax in enumerate(axs):
     
     
     if cumulative_enabled:
-        cumulative_sums.append(np.cumsum(sizes))    
-        
+        cumulative_sums.append(np.cumsum(sizes)*width)
+    
+    sums.append((
+        ('All data', np.sum(full_data['PSD_corrected_[counts/mL/nm]'])*width),
+        (top_nm, np.sum(sizes*width))
+    ))        
     
     overall_max = max(sizes.max(), overall_max)
     if previous_sizes is not None and difference_enabled:
@@ -302,6 +313,7 @@ def generate_rows():
         return [subsetting.get_value(sample) for _, subsetting in subsettings]
             
         
+    top_nm = None
     for i in range(num_of_plots):
         sample = samples[i]
         
@@ -314,6 +326,16 @@ def generate_rows():
                 column_quantities[tag] = quantity
                 continue
             column_quantities[tag] = max(column_quantities[tag], quantity)
+        
+        data_sums = sums[i]
+        assert len(data_sums) == 2
+        if top_nm is None:
+            top_nm, _ = data_sums[1]
+        assert data_sums[1][0] == top_nm
+    for i, name in enumerate(column_names):
+        if '{top_nm}' in name:
+            column_names[i] = name.format(top_nm = top_nm)
+        
         
     previous_time = None
     for i, ax in enumerate(axs):
@@ -367,6 +389,10 @@ def generate_rows():
         else:
             row.append(int((time - previous_time).total_seconds()))
         previous_time = time
+        
+        data_sums = sums[i]
+        row.append(f"{data_sums[0][1]:.2E}")
+        row.append(f"{data_sums[1][1]:.2E}")
         
         row.append("")
         
