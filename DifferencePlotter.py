@@ -22,13 +22,17 @@ width, height = mpl.rcParamsDefault["figure.figsize"]
 from matplotlib import pyplot as plt, cm
 from sample_class import Sample
 from settings_classes import Setting, Settings
+from InfoComparison import compare_info
 
 
 cumulative_enabled = True
 peaks_enabled = False
 difference_enabled = False
 
+use_filenames = True
+
 x_lim = 400
+output_folder = "/Users/henryingels/Documents/GitHub/Ridgeline-Plotter/CSV outputs"
 datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
@@ -48,7 +52,9 @@ table_width = 2
 # table_left_margin = 0 if difference_enabled else 0.02
 table_left_margin = 0.02
 minimum_table_right_margin = 0.03
-column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", "Time after\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
+
+results_column_names = ["Time after\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
+column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", *results_column_names]
 column_widths = [0.2, 0.07, 0.2, 0.07, 0.19, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
 
 kernel_size = 30
@@ -81,8 +87,11 @@ def generate_samples():
         sample = Sample(os.path.join(datafolder, folder), prefix, suffix)
         if sample.filename not in filenames: continue
         yield sample.filename, sample
-unordered_samples = dict(generate_samples())
-samples = [unordered_samples[name] for name in filenames]
+if use_filenames:
+    unordered_samples = dict(generate_samples())
+    samples = [unordered_samples[name] for name in filenames]
+else:
+    _, samples = tuple(zip(*generate_samples()))
 
 
 num_of_plots = len(samples)
@@ -268,6 +277,11 @@ table_top = axis_positions[0] + 0.5*cell_height
 table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
+md_settings = [
+    Setting('experimental_unit'),#, column = 0),
+    Setting('treatment'),
+    Setting('wait'),
+    Setting('filter', column = 1) ]
 red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
 green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
 blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
@@ -286,13 +300,12 @@ xml_settings = [
     Setting('NumOfVideos', name = 'Number of videos', datatype = int),
     Setting('StirrerSpeed', name = 'Stirring speed', datatype = int),
     Setting('StirredTime', name = 'Stirred time', datatype = int) ]
-md_settings = [
-    Setting('experimental_unit'),#, column = 0),
-    Setting('treatment'),
-    Setting('wait'),
-    Setting('filter', column = 1) ]
-settings_list = [*xml_settings, *md_settings]
+settings_list = [*md_settings, *xml_settings]
 settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
+
+results_for_csv = Setting('_results')
+settings.add_setting('_results', results_for_csv)
+
 
 def generate_rows():
     column_quantities = dict()
@@ -332,9 +345,21 @@ def generate_rows():
         if top_nm is None:
             top_nm, _ = data_sums[1]
         assert data_sums[1][0] == top_nm
+    
     for i, name in enumerate(column_names):
         if '{top_nm}' in name:
             column_names[i] = name.format(top_nm = top_nm)
+    for i, name in enumerate(results_column_names):     # This is redundant; should find a better way.
+        if '{top_nm}' in name:
+            results_column_names[i] = name.format(top_nm = top_nm)
+    
+    # for result_name in results_column_names:
+    #     result_object = Setting(result_name)
+    #     results_for_csv.add_subsetting(result_object, result_name)
+    results_for_csv.add_subsetting(Setting(results_column_names[0]), 'elapsed_time')
+    results_for_csv.add_subsetting(Setting(results_column_names[1]), 'total_conc_under_topnm')
+    results_for_csv.add_subsetting(Setting(results_column_names[2]), 'total_conc')
+    print(results_for_csv.subsettings.keys())
         
         
     previous_time = None
@@ -385,14 +410,24 @@ def generate_rows():
         
         time = settings.by_tag('time').get_value(sample)
         if previous_time is None:
-            row.append(None)
+            elapsed_time = None
         else:
-            row.append(int((time - previous_time).total_seconds()))
+            elapsed_time = int((time - previous_time).total_seconds())
+        row.append(elapsed_time)
+        # column_name = column_names[len(row)]
+        # results_for_csv.subsettings[column_name].set_value(sample, elapsed_time)
+        results_for_csv.elapsed_time.set_value(sample, elapsed_time)
         previous_time = time
         
         data_sums = sums[i]
+        
+        # column_name = column_names[len(row)]
         row.append(f"{data_sums[0][1]:.2E}")
+        results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
+        
+        # column_name = column_names[len(row)]
         row.append(f"{data_sums[1][1]:.2E}")
+        results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
         
         row.append("")
         
@@ -421,3 +456,6 @@ for (row, column), cell in table.get_celld().items():
         cell.set(edgecolor = None)
         continue
     cell.set(edgecolor = grid_color)
+
+
+compare_info(settings, samples, results_for_csv, output_folder)
