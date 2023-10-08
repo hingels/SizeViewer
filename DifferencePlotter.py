@@ -24,11 +24,11 @@ from sample_class import Sample
 from settings_classes import Setting, Settings
 
 
-cumulative_enabled = False
+cumulative_enabled = True
 peaks_enabled = False
-difference_enabled = True
+difference_enabled = False
 
-x_lim = 250
+x_lim = 400
 datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
@@ -44,11 +44,12 @@ filenames = [
     "230729 KW+EW re-measure 4"#,
     # "230701a, pre+96h fluor +DiO+Triton"
 ]
-table_width = 1.2
-table_left_margin = 0 if difference_enabled else 0.02
+table_width = 1.4
+# table_left_margin = 0 if difference_enabled else 0.02
+table_left_margin = 0.02
 minimum_table_right_margin = 0.03
 column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity"]
-column_widths = [0.14, 0.07, 0.14, 0.07, 0.19, 0.08, 0.1, 0.13, 0.08, 0.16]
+column_widths = [0.2, 0.07, 0.2, 0.07, 0.19, 0.14, 0.1, 0.13, 0.08, 0.16]
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -104,7 +105,7 @@ previous_sizes = None
 for i, ax in enumerate(axs):
     sample = samples[i]
     
-    data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python').iloc[:250, :]
+    data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python').iloc[:400, :]
     new_bins = data['CenterBinDiameter_[nm]']
     if bins is not None:
         assert np.all(new_bins == bins) == True, 'Unequal sequence of bins between samples detected!'
@@ -268,13 +269,14 @@ xml_settings = [
     blue_enabled,
     Setting('Exposure', units = 'ms', column = 3, datatype = int),
     Setting('Gain', units = 'dB', column = 4, datatype = int),
+    Setting('MeasurementStartDateTime'),#, column = 5),
     Setting('FrameRate', name = 'Framerate', units = 'frames/sec', datatype = int),
     Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
     Setting('NumOfVideos', name = 'Number of videos', datatype = int),
     Setting('StirrerSpeed', name = 'Stirring speed', datatype = int),
     Setting('StirredTime', name = 'Stirred time', datatype = int) ]
 md_settings = [
-    Setting('experimental_unit', column = 0),
+    Setting('experimental_unit'),#, column = 0),
     Setting('treatment'),
     Setting('wait'),
     Setting('filter', column = 1) ]
@@ -283,23 +285,13 @@ settings = Settings(OrderedDict({setting.tag: setting for setting in settings_li
 
 def generate_rows():
     column_quantities = dict()
-    def number_of_subtags(tag):#, sample):
-        if (setting := settings.by_tag(tag)) is None:# or (value := setting.get_value(sample)) is None:
+    def number_of_subtags(tag):
+        if (setting := settings.by_tag(tag)) is None:
             return 0
-        # if type(value) is list:
-        #     return len(value)
-        # return 1
         return len(setting.subsettings)
     def get_multivalued(tag, sample):
-        if (setting := settings.by_tag(tag)) is None:# or (value := setting.get_value(sample)) is None:
-            return []
-        # if type(value) is list:
-        #     value.sort()
-        #     value = [subvalue for index, subvalue in value]
-        # else:
-        #     value = [value]
-        # return value
-        
+        if (setting := settings.by_tag(tag)) is None:
+            return []        
         if len(setting.subsettings) == 0:
             value = setting.get_value(sample)
             if value is None: return []
@@ -315,11 +307,7 @@ def generate_rows():
         
         settings.read_files(sample)
         
-        
         for tag in ('treatment', 'wait'):
-            # print(sample.filename, tag)
-            # print('Hello', settings.by_tag(tag), settings.by_tag(tag).subsettings)
-            # quantity = number_of_subtags(tag, sample)
             quantity = number_of_subtags(tag)
             if tag not in column_quantities:
                 column_quantities[tag] = quantity
@@ -339,14 +327,21 @@ def generate_rows():
             if j < len(waits): row.append(waits[j])
             else: row.append(None)
         
+        experimental_unit = settings.by_tag('experimental_unit')
+        text = ''
+        if experimental_unit is not None:
+            value = experimental_unit.get_value(sample)
+            text += value if value is not None else ''
+            if hasattr(experimental_unit, 'date'):
+                date = experimental_unit.date.get_value(sample)
+                text += f'\n{date}' if date is not None else ''
+        row.append(text)        
         # experimental_unit_subtags = number_of_subtags('experimental_unit', sample)
         # # experimental_unit = get_multivalued('experimental_unit', sample)
-        # setting = 
+        # # setting = 
         # if experimental_unit_subtags == 0: experimental_unit = None
         # elif experimental_unit_subtags == 1: experimental_unit = setting.get_value(sample)
         # elif len()
-        
-            
                     
         columns = list(settings.columns.items())
         columns.sort()

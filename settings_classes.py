@@ -97,7 +97,8 @@ class Settings():
         with open(sample.xml) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
-            for entry in (root.iter() if get_all else root.find('RecordingSettings')):
+            # for entry in (root.iter() if get_all else root.find('RecordingSettings')):
+            for entry in root.iter():
                 tag = entry.tag
                 if tag in tags:
                     setting = by_tag(tag)
@@ -137,7 +138,6 @@ class Settings():
                 if subtag.isdigit():
                     assert float(subtag).is_integer()
                     subtag = int(subtag)
-                    # subtag = f"number{subtag}"
                 
                 if subtag not in setting.subsettings:
                     subsetting = Setting(full_tag)

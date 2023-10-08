@@ -28,7 +28,8 @@ filenames = [
     "230729 KW+EW re-measure",
     "230729 KW+EW re-measure 2",
     "230729 KW+EW re-measure 3",
-    "230729 KW+EW re-measure 4"
+    "230729 KW+EW re-measure 4",
+    "230701a, pre+96h fluor +DiO+Triton"
 ]
 table_width = 1.2
 table_left_margin = 0
@@ -73,7 +74,13 @@ for sample in samples:
 
 os.makedirs(output_folder, exist_ok = True)
 
-all_tags, setting_objects = zip(*settings.tags.items())
+def generate_setting_objects():
+    for tag, setting in settings.tags.items():
+        yield tag, setting
+        for subtag, subsetting in setting.subsettings.items():
+            yield f"{tag}.{subtag}", subsetting
+# all_tags, setting_objects = zip(*settings.tags.items())
+all_tags, setting_objects = zip(*generate_setting_objects())
 
 same_valued_settings = []
 different_valued_settings = []
@@ -96,7 +103,6 @@ all_csv_dataframe.to_csv(os.path.join(output_folder, 'all.csv'))
 same_values_csv_dataframe = pd.DataFrame(
     data = (
         pd.Series((setting.get_value(sample) for sample in samples), index = [sample.filename for sample in samples])
-        # pd.Series(sum((setting.get_subvalues(sample) for sample in samples), []), index = [sample.filename for sample in samples])
         for setting in same_valued_settings
     ), index = [setting.tag for setting in same_valued_settings]
 )
@@ -105,7 +111,6 @@ same_values_csv_dataframe.to_csv(os.path.join(output_folder, 'same_values.csv'))
 different_values_csv_dataframe = pd.DataFrame(
     data = (
         pd.Series((setting.get_value(sample) for sample in samples), index = [sample.filename for sample in samples])
-        # pd.Series(sum((setting.get_subvalues(sample) for sample in samples), []), index = [sample.filename for sample in samples])
         for setting in different_valued_settings
     ), index = [setting.tag for setting in different_valued_settings]
 )
