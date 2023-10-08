@@ -15,9 +15,10 @@ from settings_classes import Setting, Settings
 
 
 output_folder = "/Users/henryingels/Documents/GitHub/Ridgeline-Plotter/CSV outputs"
-datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Complete data"
+datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
+use_filenames = True
 filenames = [
     # "230709 1-100000 standard",
     # "230709 1-100000 standard #2",
@@ -46,10 +47,13 @@ column_names.append("")
 def generate_samples():
     for folder in os.listdir(datafolder):
         sample = Sample(os.path.join(datafolder, folder), prefix, suffix)
-        if sample.name not in filenames: continue
+        if use_filenames and sample.filename not in filenames: continue
         yield sample.filename, sample
-unordered_samples = dict(generate_samples())
-samples = [unordered_samples[name] for name in filenames]
+if use_filenames:
+    unordered_samples = dict(generate_samples())
+    samples = [unordered_samples[name] for name in filenames]
+else:
+    _, samples = tuple(zip(*generate_samples()))
 
 settings = Settings()
 

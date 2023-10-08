@@ -11,7 +11,7 @@ import typing
 import xml.etree.ElementTree as ET
 
 class Setting():
-    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None):
+    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None):
         self.tag = tag
         if name is None: name = tag
         self.name = name
@@ -21,11 +21,24 @@ class Setting():
         if sample_values is not None:
             for sample, value in sample_values.items():
                 self.set_value(sample, value)
+
+        self.subsettings = dict()
+        self.numbered_subsettings = dict()
+        if subsettings is not None:
+            for subtag, subsetting in subsettings.items():
+                self.add_subsetting(subtag, subsetting)
         
         self.show_unit = show_unit
         self.show_name = show_name
         self.datatype = datatype
         self.depends_on = depends_on
+    def add_subsetting(self, subsetting, subtag):
+        self.subsettings[subtag] = subsetting
+        if type(subtag) is int:
+            self.numbered_subsettings[subtag] = subsetting
+            return
+        assert hasattr(self, subtag) is False
+        setattr(self, subtag, subsetting)
     def set_value(self, sample: Sample, value, datatype = None):
         if datatype is None:
             datatype = self.datatype
@@ -42,17 +55,6 @@ class Setting():
         sample_values = self.sample_values
         if sample not in sample_values: return None
         return sample_values[sample]
-    def get_subvalues(self, sample: Sample):
-        value = self.get_value(sample)
-        if value is None:
-            return [None]
-        if type(value) is list:
-            value.sort()
-            value = [subvalue for index, subvalue in value]
-        else:
-            value = [value]
-        print(value)
-        return value
 class Settings():
     def __init__(self, settings_dict = None):
         if settings_dict is None:
@@ -110,33 +112,39 @@ class Settings():
                 setting.set_value(sample, entry.text)
         with open(sample.info) as info_file:
             for line in info_file.readlines():
-                tag, value = line.split('=')
+                full_tag, value = line.split('=')
                 value = value.strip()
-                tag = tag.split('.')
-                is_multivalued = (len(tag) != 1)
-                tag_base = tag[0]
-                if tag_base in tags:
-                    setting = by_tag(tag_base)
-                else:
-                    if tag_base in dependencies:
+                tag_split = full_tag.split('.')
+                
+                tag_base = tag_split[0]
+                if tag_base not in tags:
+                    if tag_base in dependencies:                        
                         dependency = dependencies[tag_base]
                         setting = Setting(tag_base, depends_on = dependency)
                     else:
                         setting = Setting(tag_base)
                     add_setting(tag_base, setting)
-                if is_multivalued is False:
+                else:
+                    setting = by_tag(tag_base)
+                
+                if len(tag_split) == 1:        # If has no subvalues:
                     setting.set_value(sample, value)
                     continue
-                assert len(tag) == 2
-                value_index = tag[1]
-                assert value_index.isdigit() and float(value_index).is_integer()
-                value_index = int(value_index)
-                if sample in setting.sample_values:
-                    current_value = setting.get_value(sample)
-                    if type(current_value) is not list:
-                        current_value = [(1, current_value)]
-                    current_value.append((value_index, value))
+                
+                assert len(tag_split) == 2
+                subtag = tag_split[1]
+                
+                if subtag.isdigit():
+                    assert float(subtag).is_integer()
+                    subtag = int(subtag)
+                    # subtag = f"number{subtag}"
+                
+                if subtag not in setting.subsettings:
+                    subsetting = Setting(full_tag)
+                    setting.add_subsetting(subsetting, subtag)
                 else:
-                    current_value = [(1, value)]
-                setting.set_value(sample, current_value, datatype = list)
+                    subsetting = setting.subsettings[subtag]
+                
+                subsetting.set_value(sample, value)
+                
         self.apply_dependencies()

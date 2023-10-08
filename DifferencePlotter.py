@@ -25,7 +25,7 @@ from settings_classes import Setting, Settings
 
 
 cumulative_enabled = False
-peaks_enabled = True
+peaks_enabled = False
 difference_enabled = True
 
 x_lim = 250
@@ -41,7 +41,8 @@ filenames = [
     "230729 KW+EW re-measure",
     "230729 KW+EW re-measure 2",
     "230729 KW+EW re-measure 3",
-    "230729 KW+EW re-measure 4"
+    "230729 KW+EW re-measure 4"#,
+    # "230701a, pre+96h fluor +DiO+Triton"
 ]
 table_width = 1.2
 table_left_margin = 0 if difference_enabled else 0.02
@@ -77,7 +78,7 @@ column_names.append("")
 def generate_samples():
     for folder in os.listdir(datafolder):
         sample = Sample(os.path.join(datafolder, folder), prefix, suffix)
-        if sample.name not in filenames: continue
+        if sample.filename not in filenames: continue
         yield sample.filename, sample
 unordered_samples = dict(generate_samples())
 samples = [unordered_samples[name] for name in filenames]
@@ -130,7 +131,8 @@ for i, ax in enumerate(axs):
         assert len(maxima) != 0, 'No peaks found. The second derivative threshold may be too high.'
         
         rejected_candidates = np.array([entry for entry in maxima_candidates if entry not in maxima])
-        plt.plot(bins[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
+        if len(rejected_candidates) != 0:
+            plt.plot(bins[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
         plt.plot(bins[maxima], filtered[maxima], **maxima_marker)
     
     
@@ -281,28 +283,44 @@ settings = Settings(OrderedDict({setting.tag: setting for setting in settings_li
 
 def generate_rows():
     column_quantities = dict()
-    def number_of_values(tag, sample):
-        if (setting := settings.by_tag(tag)) is None or (value := setting.get_value(sample)) is None:
+    def number_of_subtags(tag):#, sample):
+        if (setting := settings.by_tag(tag)) is None:# or (value := setting.get_value(sample)) is None:
             return 0
-        if type(value) is list:
-            return len(value)
-        return 1
+        # if type(value) is list:
+        #     return len(value)
+        # return 1
+        return len(setting.subsettings)
     def get_multivalued(tag, sample):
-        if (setting := settings.by_tag(tag)) is None or (value := setting.get_value(sample)) is None:
-            return [None]
-        if type(value) is list:
-            value.sort()
-            value = [subvalue for index, subvalue in value]
-        else:
-            value = [value]
-        return value
+        if (setting := settings.by_tag(tag)) is None:# or (value := setting.get_value(sample)) is None:
+            return []
+        # if type(value) is list:
+        #     value.sort()
+        #     value = [subvalue for index, subvalue in value]
+        # else:
+        #     value = [value]
+        # return value
+        
+        if len(setting.subsettings) == 0:
+            value = setting.get_value(sample)
+            if value is None: return []
+            return value
+        
+        subsettings = list(setting.numbered_subsettings.items())
+        subsettings.sort()
+        return [subsetting.get_value(sample) for _, subsetting in subsettings]
+            
+        
     for i in range(num_of_plots):
         sample = samples[i]
         
         settings.read_files(sample)
         
+        
         for tag in ('treatment', 'wait'):
-            quantity = number_of_values(tag, sample)
+            # print(sample.filename, tag)
+            # print('Hello', settings.by_tag(tag), settings.by_tag(tag).subsettings)
+            # quantity = number_of_subtags(tag, sample)
+            quantity = number_of_subtags(tag)
             if tag not in column_quantities:
                 column_quantities[tag] = quantity
                 continue
@@ -312,7 +330,7 @@ def generate_rows():
         row = []
         
         sample = samples[i]
-                
+        
         treatments = get_multivalued('treatment', sample)
         waits = get_multivalued('wait', sample)
         for j in range( max(column_quantities['treatment'], column_quantities['wait']) ):
@@ -320,6 +338,15 @@ def generate_rows():
             else: row.append(None)
             if j < len(waits): row.append(waits[j])
             else: row.append(None)
+        
+        # experimental_unit_subtags = number_of_subtags('experimental_unit', sample)
+        # # experimental_unit = get_multivalued('experimental_unit', sample)
+        # setting = 
+        # if experimental_unit_subtags == 0: experimental_unit = None
+        # elif experimental_unit_subtags == 1: experimental_unit = setting.get_value(sample)
+        # elif len()
+        
+            
                     
         columns = list(settings.columns.items())
         columns.sort()

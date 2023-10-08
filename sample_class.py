@@ -16,6 +16,7 @@ class Sample():
         dat_path = None
         for (path, subdirs, files) in os.walk(folder):
             for filename in files:
+                if filename.startswith('._'): continue
                 full_path = os.path.join(path, filename)
                 if filename == 'info.md':
                     info_path = full_path
