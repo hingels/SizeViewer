@@ -36,6 +36,19 @@ output_folder = "/Users/henryingels/Documents/GitHub/Ridgeline-Plotter/CSV outpu
 datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
+
+# filenames = [
+#     "230709 1-100000 standard",
+#     "230709 1-100000 standard #2",
+#     "230709 standard + 0.01uM lipo",
+#     "230709 standard + 0.01uM lipo #2",
+#     "230728 std",
+#     "230728 std 32ms",
+#     "230728 std 32ms refocus",
+#     "230728 std, diff det settings",
+#     "230728 std, diff det settings #2"
+# ]
+
 filenames = [
     # "230709 1-100000 standard",
     # "230709 1-100000 standard #2",
@@ -48,14 +61,16 @@ filenames = [
     "230729 KW+EW re-measure 4"#,
     # "230701a, pre+96h fluor +DiO+Triton"
 ]
+
 table_width = 2
 # table_left_margin = 0 if difference_enabled else 0.02
 table_left_margin = 0.02
 minimum_table_right_margin = 0.03
 
 results_column_names = ["Time after\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
-column_names = ["1st\ntreatment\n(µM)", "1st\n4°C\nwait\n(h)", "2nd\ntreatment\n(µM)", "2nd\n4°C\nwait\n(h)", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", *results_column_names]
-column_widths = [0.2, 0.07, 0.2, 0.07, 0.19, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
+treatments_and_waits = [("Treatment\n{treatment_number}\n(µM)", 0.2), ("4°C\nwait\n{wait_number}\n(h)", 0.07)]
+column_names = ["_treatments_waits", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", *results_column_names]
+column_widths = [0.19, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -73,13 +88,6 @@ maxima_description = f": Peaks with under {second_derivative_threshold} counts/m
 grid_color = '0.8'
 rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}
 maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'}
-
-
-width_sum = sum(column_widths)
-table_right_margin = table_width - width_sum
-assert table_right_margin >= minimum_table_right_margin, f"table_right_margin = {table_right_margin} < minimum_table_right_margin = {minimum_table_right_margin}."
-column_widths = np.append(column_widths, table_right_margin)
-column_names.append("")
 
                     
 def generate_samples():
@@ -349,17 +357,52 @@ def generate_rows():
     for i, name in enumerate(column_names):
         if '{top_nm}' in name:
             column_names[i] = name.format(top_nm = top_nm)
+        # # else:
+        # #     for tag in ('treatment', 'wait'):
+        # #         keyword = f"{tag}_number"
+        # #         if keyword not in name: continue
+        # #         column_quantity = column_quantities[tag]
+        # #         print(name)
+        # #         column_names[i] = name.format(**{tag: 1})
+        # #         print(column_names[i])
+        # #         for j in range(1, column_quantity):
+        # #             column_names.insert(i + j, name.format(**{tag: 1 + j}))
+        # #             column_widths.insert(i + j, column_widths[i])
+        # elif '{treatment_number}' in name:
+        #     num_of_treatments = column_quantities['treatment']
+        #     column_names[i] = name.format(treatment_number = 1)
+        #     for j in range(1, num_of_treatments):
+        #         column_names.insert(i + j, name.format(treatment_number = 1 + j))
+        #         column_widths.insert(i + j, column_widths[i])
+        # elif '{wait_number}' in name:
+        #     num_of_waits = column_quantities['wait']
+        #     column_names[i] = name.format(wait_number = 1)
+        #     for j in range(1, num_of_waits):
+        #         column_names.insert(i + j, name.format(wait_number = 1 + j))
+        #         column_widths.insert(i + j, column_widths[i])
+        elif name == '_treatments_waits':
+            column_names.pop(i)
+            num_of_treatments = column_quantities['treatment']
+            num_of_waits = column_quantities['wait']
+            treatment_column_name, treatment_column_width = treatments_and_waits[0]
+            wait_column_name, wait_column_width = treatments_and_waits[1]
+            index = 0
+            for j in range(max(num_of_treatments, num_of_waits)):
+                if j < num_of_treatments:
+                    column_names.insert(i + index, treatment_column_name.format(treatment_number = j + 1))
+                    column_widths.insert(i + index, treatment_column_width)
+                    index += 1
+                if j < num_of_waits:
+                    column_names.insert(i + index, wait_column_name.format(wait_number = j + 1))
+                    column_widths.insert(i + index, wait_column_width)
+                    index += 1
     for i, name in enumerate(results_column_names):     # This is redundant; should find a better way.
         if '{top_nm}' in name:
             results_column_names[i] = name.format(top_nm = top_nm)
     
-    # for result_name in results_column_names:
-    #     result_object = Setting(result_name)
-    #     results_for_csv.add_subsetting(result_object, result_name)
     results_for_csv.add_subsetting(Setting(results_column_names[0]), 'elapsed_time')
     results_for_csv.add_subsetting(Setting(results_column_names[1]), 'total_conc_under_topnm')
     results_for_csv.add_subsetting(Setting(results_column_names[2]), 'total_conc')
-    print(results_for_csv.subsettings.keys())
         
         
     previous_time = None
@@ -385,12 +428,6 @@ def generate_rows():
                 age = experimental_unit.age.get_value(sample)
                 text += f'\n{age}' if age is not None else ''
         row.append(text)        
-        # experimental_unit_subtags = number_of_subtags('experimental_unit', sample)
-        # # experimental_unit = get_multivalued('experimental_unit', sample)
-        # # setting = 
-        # if experimental_unit_subtags == 0: experimental_unit = None
-        # elif experimental_unit_subtags == 1: experimental_unit = setting.get_value(sample)
-        # elif len()
                     
         columns = list(settings.columns.items())
         columns.sort()
@@ -414,18 +451,14 @@ def generate_rows():
         else:
             elapsed_time = int((time - previous_time).total_seconds())
         row.append(elapsed_time)
-        # column_name = column_names[len(row)]
-        # results_for_csv.subsettings[column_name].set_value(sample, elapsed_time)
         results_for_csv.elapsed_time.set_value(sample, elapsed_time)
         previous_time = time
         
         data_sums = sums[i]
         
-        # column_name = column_names[len(row)]
         row.append(f"{data_sums[0][1]:.2E}")
         results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
         
-        # column_name = column_names[len(row)]
         row.append(f"{data_sums[1][1]:.2E}")
         results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
         
@@ -437,8 +470,18 @@ def generate_rows():
 display_coords = final_ax.transData.transform([0, overall_min])
 edge = right_edge_figure + table_left_margin
 
+
+rows = tuple(generate_rows())
+
+width_sum = sum(column_widths)
+table_right_margin = table_width - width_sum
+assert table_right_margin >= minimum_table_right_margin, f"table_right_margin = {table_right_margin} < minimum_table_right_margin = {minimum_table_right_margin}."
+column_widths.append(table_right_margin)
+column_names.append("")
+
+
 table = plt.table(
-    tuple(generate_rows()),
+    rows,
     bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]),
     transform = transFigure,
     cellLoc = 'left', colWidths = column_widths)
