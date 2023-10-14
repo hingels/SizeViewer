@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
 class Setting():
-    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False):
+    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
         self.tag = tag
         if name is None: name = tag
         self.name = name
@@ -33,6 +33,7 @@ class Setting():
         self.show_name = show_name
         self.datatype = datatype
         self.depends_on = depends_on
+        self.dependencies_require = dependencies_require
 
         self.hidden = hidden
     def add_subsetting(self, subsetting, subtag):
@@ -95,9 +96,11 @@ class Settings():
             setting = self.by_tag(tag)
             depends_on = setting.depends_on
             if depends_on is None: continue
+            requirement = depends_on.dependencies_require
             for sample, value in setting.sample_values.items():
-                if depends_on.get_value(sample) is False:
-                    setting.set_value(sample, setting.datatype(0))
+                if depends_on.get_value(sample) != requirement:
+                    # setting.set_value(sample, setting.datatype(0))
+                    setting.set_value(sample, None)
     def parse_time(self, sample):
         if 'MeasurementStartDateTime' not in self.tags: return
         measurement_time = datetime.strptime(self.by_tag('MeasurementStartDateTime').get_value(sample), '%Y-%m-%d %H:%M:%S')

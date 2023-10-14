@@ -46,20 +46,20 @@ filenames = [
     "230729 KW+EW re-measure",
     "230729 KW+EW re-measure 2",
     "230729 KW+EW re-measure 3",
-    "230729 KW+EW re-measure 4"#,
-    # "230701a, pre+96h fluor +DiO+Triton"
+    "230729 KW+EW re-measure 4",
+    "230701a, pre+96h fluor +DiO+Triton"
 ]
 
 
-table_width = 2.3
+table_width = 2.6
 # table_left_margin = 0 if difference_enabled else 0.02
 table_left_margin = 0.02
 minimum_table_right_margin = 0.03
 
 results_column_names = ["Time since\nabove (s)", "Time since\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
 treatments_and_waits = [("Treatment\n{treatment_number}\n(µM)", 0.2), ("4°C\nwait\n{wait_number}\n(h)", 0.07)]
-column_names = ["_treatments_waits", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", *results_column_names]
-column_widths = [0.3, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.17, 0.2, 0.2]
+column_names = ["_treatments_waits", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", "Detection\nsetting", "Stirring\nRPM x sec", *results_column_names]
+column_widths = [0.3, 0.14, 0.1, 0.13, 0.08, 0.16, 0.19, 0.16, 0.16, 0.17, 0.2, 0.2]
 # column_widths = [0.38, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
 
 kernel_size = 30
@@ -284,6 +284,7 @@ md_settings = [
 red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
 green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
 blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
+detection_threshold_setting = Setting('DetectionThresholdType', name = 'Detection mode', dependencies_require = 'Manual')
 xml_settings = [
     Setting('RedLaserPower', name = 'R', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = red_enabled),
     red_enabled,
@@ -298,7 +299,9 @@ xml_settings = [
     Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
     Setting('NumOfVideos', name = 'Number of videos', datatype = int),
     Setting('StirrerSpeed', name = 'Stirring speed', datatype = int),
-    Setting('StirredTime', name = 'Stirred time', datatype = int) ]
+    Setting('StirredTime', name = 'Stirred time', datatype = int),
+    detection_threshold_setting,
+    Setting('DetectionThreshold', name = 'Detection threshold', datatype = float, depends_on = detection_threshold_setting) ]
 settings_list = [*md_settings, *xml_settings]
 settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
 
@@ -443,6 +446,17 @@ def generate_rows():
         num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
         row.append(f"{video_duration}x{num_of_videos}")
         
+        detection_mode = settings.by_tag('DetectionThresholdType').get_value(sample)
+        detection_threshold = settings.by_tag('DetectionThreshold').get_value(sample)
+        if detection_threshold is None:            
+            row.append(detection_mode)
+        else:
+            row.append(f"{detection_mode}\n{detection_threshold}")
+        
+        stir_rpm = settings.by_tag('StirrerSpeed').get_value(sample)
+        stir_time = settings.by_tag('StirredTime').get_value(sample)
+        row.append(f"{stir_rpm}x{stir_time}")        
+        
         time = settings.by_tag('time').get_value(sample)
         elapsed_time = None
         if time_of_above is not None:
@@ -454,10 +468,13 @@ def generate_rows():
         previous = settings.by_tag('previous').get_value(sample)
         elapsed_time = None
         if previous is not None:
-            assert previous in unordered_samples, f'"{previous}" is not present in the inputted samples: {unordered_samples.keys()}.'
-            previous_sample = unordered_samples[previous]
-            time_of_previous = settings.by_tag('time').get_value(previous_sample)
-            elapsed_time = int((time - time_of_previous).total_seconds())
+            # assert previous in unordered_samples, f'"{previous}" is not present in the inputted samples: {unordered_samples.keys()}.'
+            if previous not in unordered_samples:
+                elapsed_time = '?'
+            else:
+                previous_sample = unordered_samples[previous]
+                time_of_previous = settings.by_tag('time').get_value(previous_sample)
+                elapsed_time = int((time - time_of_previous).total_seconds())
         row.append(elapsed_time)#Time since previous
         results_for_csv.time_since_previous.set_value(sample, elapsed_time)
         
