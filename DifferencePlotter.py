@@ -37,18 +37,6 @@ datafolder = "/Volumes/Lab Drive/ViewSizer 3000/Data"
 prefix = 'ConstantBinsTable_'
 suffix = '.dat'
 
-# filenames = [
-#     "230709 1-100000 standard",
-#     "230709 1-100000 standard #2",
-#     "230709 standard + 0.01uM lipo",
-#     "230709 standard + 0.01uM lipo #2",
-#     "230728 std",
-#     "230728 std 32ms",
-#     "230728 std 32ms refocus",
-#     "230728 std, diff det settings",
-#     "230728 std, diff det settings #2"
-# ]
-
 filenames = [
     # "230709 1-100000 standard",
     # "230709 1-100000 standard #2",
@@ -62,15 +50,17 @@ filenames = [
     # "230701a, pre+96h fluor +DiO+Triton"
 ]
 
-table_width = 2
+
+table_width = 2.3
 # table_left_margin = 0 if difference_enabled else 0.02
 table_left_margin = 0.02
 minimum_table_right_margin = 0.03
 
-results_column_names = ["Time after\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
+results_column_names = ["Time since\nabove (s)", "Time since\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
 treatments_and_waits = [("Treatment\n{treatment_number}\n(µM)", 0.2), ("4°C\nwait\n{wait_number}\n(h)", 0.07)]
 column_names = ["_treatments_waits", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", *results_column_names]
-column_widths = [0.19, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
+column_widths = [0.3, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.17, 0.2, 0.2]
+# column_widths = [0.38, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -286,10 +276,11 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 
 md_settings = [
-    Setting('experimental_unit'),#, column = 0),
-    Setting('treatment'),
-    Setting('wait'),
-    Setting('filter', column = 1) ]
+    Setting('experimental_unit', name = 'Experimental unit'),#, column = 0),
+    Setting('treatment', name = 'Treatment'),
+    Setting('wait', name = 'Wait'),
+    Setting('filter', name = 'Filter', column = 1),
+    Setting('previous', name = 'Previous') ]
 red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
 green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
 blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
@@ -312,7 +303,7 @@ settings_list = [*md_settings, *xml_settings]
 settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
 
 results_for_csv = Setting('_results')
-settings.add_setting('_results', results_for_csv)
+# settings.add_setting('_results', results_for_csv)
 
 
 def generate_rows():
@@ -320,18 +311,24 @@ def generate_rows():
     def number_of_subtags(tag):
         if (setting := settings.by_tag(tag)) is None:
             return 0
-        return len(setting.subsettings)
+        return max(len(setting.subsettings), 1)
     def get_multivalued(tag, sample):
         if (setting := settings.by_tag(tag)) is None:
-            return []        
+            return []
         if len(setting.subsettings) == 0:
             value = setting.get_value(sample)
             if value is None: return []
-            return value
+            return [value]
         
         subsettings = list(setting.numbered_subsettings.items())
         subsettings.sort()
-        return [subsetting.get_value(sample) for _, subsetting in subsettings]
+        values = [subsetting.get_value(sample) for _, subsetting in subsettings]
+        # print(subsettings)
+        # if subsettings[0][1].get_value(sample) is None:
+        #     subsettings[0] = (subsettings[0][0], setting)
+        if values[0] is None:
+            values[0] = setting.get_value(sample)
+        return values
             
         
     top_nm = None
@@ -400,12 +397,13 @@ def generate_rows():
         if '{top_nm}' in name:
             results_column_names[i] = name.format(top_nm = top_nm)
     
-    results_for_csv.add_subsetting(Setting(results_column_names[0]), 'elapsed_time')
-    results_for_csv.add_subsetting(Setting(results_column_names[1]), 'total_conc_under_topnm')
-    results_for_csv.add_subsetting(Setting(results_column_names[2]), 'total_conc')
+    # results_for_csv.add_subsetting(Setting(results_column_names[0]), 'time_since_above')
+    results_for_csv.add_subsetting(Setting(results_column_names[1]), 'time_since_previous')
+    results_for_csv.add_subsetting(Setting(results_column_names[2]), 'total_conc_under_topnm')
+    results_for_csv.add_subsetting(Setting(results_column_names[3]), 'total_conc')
         
         
-    previous_time = None
+    time_of_above = None
     for i, ax in enumerate(axs):
         row = []
         
@@ -415,9 +413,9 @@ def generate_rows():
         waits = get_multivalued('wait', sample)
         for j in range( max(column_quantities['treatment'], column_quantities['wait']) ):
             if j < len(treatments): row.append(treatments[j])
-            else: row.append(None)
+            elif j < column_quantities['treatment']: row.append(None)
             if j < len(waits): row.append(waits[j])
-            else: row.append(None)
+            elif j < column_quantities['wait']: row.append(None)
         
         experimental_unit = settings.by_tag('experimental_unit')
         text = ''
@@ -446,13 +444,22 @@ def generate_rows():
         row.append(f"{video_duration}x{num_of_videos}")
         
         time = settings.by_tag('time').get_value(sample)
-        if previous_time is None:
-            elapsed_time = None
-        else:
-            elapsed_time = int((time - previous_time).total_seconds())
+        elapsed_time = None
+        if time_of_above is not None:
+            elapsed_time = int((time - time_of_above).total_seconds())
         row.append(elapsed_time)
-        results_for_csv.elapsed_time.set_value(sample, elapsed_time)
-        previous_time = time
+        # results_for_csv.time_since_above.set_value(sample, elapsed_time)
+        time_of_above = time
+
+        previous = settings.by_tag('previous').get_value(sample)
+        elapsed_time = None
+        if previous is not None:
+            assert previous in unordered_samples, f'"{previous}" is not present in the inputted samples: {unordered_samples.keys()}.'
+            previous_sample = unordered_samples[previous]
+            time_of_previous = settings.by_tag('time').get_value(previous_sample)
+            elapsed_time = int((time - time_of_previous).total_seconds())
+        row.append(elapsed_time)#Time since previous
+        results_for_csv.time_since_previous.set_value(sample, elapsed_time)
         
         data_sums = sums[i]
         

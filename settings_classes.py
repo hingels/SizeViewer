@@ -167,7 +167,7 @@ class Settings():
                     subtag = int(subtag)
                 
                 if subtag not in setting.subsettings:
-                    subsetting = Setting(full_tag)
+                    subsetting = Setting(full_tag, name = f"{setting.name}: {subtag}")
                     setting.add_subsetting(subsetting, subtag)
                 else:
                     subsetting = setting.subsettings[subtag]
