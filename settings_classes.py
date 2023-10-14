@@ -12,10 +12,12 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
 class Setting():
-    def __init__(self, tag, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
+    def __init__(self, tag, short_name = None, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
         self.tag = tag
         if name is None: name = tag
         self.name = name
+        if short_name is None: short_name = name
+        self.short_name = short_name
         self.units = units
         self.column = column
         self.sample_values = dict()
@@ -165,12 +167,14 @@ class Settings():
                 assert len(tag_split) == 2
                 subtag = tag_split[1]
                 
+                units = ''
                 if subtag.isdigit():
                     assert float(subtag).is_integer()
                     subtag = int(subtag)
+                    units = setting.units
                 
                 if subtag not in setting.subsettings:
-                    subsetting = Setting(full_tag, name = f"{setting.name}: {subtag}")
+                    subsetting = Setting(full_tag, name = f"{setting.name}: {subtag}", units = units)
                     setting.add_subsetting(subsetting, subtag)
                 else:
                     subsetting = setting.subsettings[subtag]

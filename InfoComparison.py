@@ -23,15 +23,21 @@ def compare_info(settings, samples, results_object, output_folder):
             if setting.tag == 'Name': continue
             if setting.hidden is False:
                 # yield tag, setting
-                yield setting.name, setting
+                units = setting.units
+                name = setting.name if units == '' else f"{setting.name} ({units})"
+                yield name, setting
             for subtag, subsetting in setting.subsettings.items():
                 if subsetting.hidden: continue
                 # yield f"{tag}.{subtag}", subsetting
-                yield subsetting.name, subsetting
+                units = subsetting.units
+                name = subsetting.name if units == '' else f"{subsetting.name} ({units})"
+                yield name, subsetting
         yield '', blank
         yield 'RESULTS:', blank
         for result in results_object.subsettings.values():
             name = result.name.replace('\n', ' ')
+            units = setting.units
+            if units != '': name += f" ({units})"
             yield name, result
     all_names, setting_objects = zip(*generate_setting_objects())
     

@@ -51,16 +51,15 @@ filenames = [
 ]
 
 
-table_width = 2.6
+table_width = 2.8
 # table_left_margin = 0 if difference_enabled else 0.02
 table_left_margin = 0.02
 minimum_table_right_margin = 0.03
 
-results_column_names = ["Time since\nabove (s)", "Time since\nprevious (s)", "Total\nconcentration\nunder {top_nm}nm\n(counts/mL)", "Total\nconcentration\n(counts/mL)"]
+results_column_names = ["Time since\nabove (s)", "Time since\nprevious (s)", "Concentration\n<{top_nm}nm\n(counts/mL)", "Concentration\n(counts/mL)"]
 treatments_and_waits = [("Treatment\n{treatment_number}\n(µM)", 0.2), ("4°C\nwait\n{wait_number}\n(h)", 0.07)]
-column_names = ["_treatments_waits", "Experimental\nunit", "Filter", "Power\n(mW)", "Exposure\n(ms)", "Gain\n(dB)", "Video\nduration (s)\nx quantity", "Detection\nsetting", "Stirring\nRPM x sec", *results_column_names]
-column_widths = [0.3, 0.14, 0.1, 0.13, 0.08, 0.16, 0.19, 0.16, 0.16, 0.17, 0.2, 0.2]
-# column_widths = [0.38, 0.14, 0.1, 0.13, 0.08, 0.16, 0.16, 0.2, 0.2]
+column_names = ["_treatments_waits", "Experimental\nunit", "Filter\ncut-on\n(nm)", "Power\n(mW)", "Exposure,\ngain", "Detection\nsetting", "Video\nduration (s)\nx quantity", "Stirring\nsec x RPM", "ID", *results_column_names]
+column_widths = [0.3, 0.1, 0.19, 0.14, 0.19, 0.16, 0.16, 0.25, 0.16, 0.17, 0.2, 0.2]
 
 kernel_size = 30
 x = np.linspace(0, kernel_size, kernel_size)
@@ -277,29 +276,31 @@ table_bottom = axis_positions[-1] - 0.5*cell_height
 
 md_settings = [
     Setting('experimental_unit', name = 'Experimental unit'),#, column = 0),
-    Setting('treatment', name = 'Treatment'),
-    Setting('wait', name = 'Wait'),
-    Setting('filter', name = 'Filter', column = 1),
+    Setting('treatment', name = 'Treatment', units = 'µM'),
+    Setting('wait', name = 'Wait', units = 'h'),
+    Setting('filter', name = 'Filter cut-on', units = 'nm', column = 1),
     Setting('previous', name = 'Previous') ]
 red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
 green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
 blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
 detection_threshold_setting = Setting('DetectionThresholdType', name = 'Detection mode', dependencies_require = 'Manual')
 xml_settings = [
-    Setting('RedLaserPower', name = 'R', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = red_enabled),
+    Setting('RedLaserPower', short_name = '635nm', name = '635nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = red_enabled),
     red_enabled,
-    Setting('GreenLaserPower', name = 'G', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = green_enabled),
+    Setting('GreenLaserPower', short_name = '520nm', name = '520nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = green_enabled),
     green_enabled,
-    Setting('BlueLaserPower', name = 'B', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = blue_enabled),
+    Setting('BlueLaserPower', short_name = '445nm', name = '445nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = blue_enabled),
     blue_enabled,
-    Setting('Exposure', units = 'ms', column = 3, datatype = int),
-    Setting('Gain', units = 'dB', column = 4, datatype = int),
+    # Setting('Exposure', units = 'ms', column = 3, datatype = int),
+    # Setting('Gain', units = 'dB', column = 4, datatype = int),
+    Setting('Exposure', units = 'ms', datatype = int),
+    Setting('Gain', units = 'dB', datatype = int),
     Setting('MeasurementStartDateTime'),#, column = 5),
-    Setting('FrameRate', name = 'Framerate', units = 'frames/sec', datatype = int),
+    Setting('FrameRate', name = 'Framerate', units = 'fps', datatype = int),
     Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
     Setting('NumOfVideos', name = 'Number of videos', datatype = int),
-    Setting('StirrerSpeed', name = 'Stirring speed', datatype = int),
-    Setting('StirredTime', name = 'Stirred time', datatype = int),
+    Setting('StirrerSpeed', name = 'Stirring speed', units = 'rpm', datatype = int),
+    Setting('StirredTime', name = 'Stirred time', units = 's', datatype = int),
     detection_threshold_setting,
     Setting('DetectionThreshold', name = 'Detection threshold', datatype = float, depends_on = detection_threshold_setting) ]
 settings_list = [*md_settings, *xml_settings]
@@ -434,9 +435,20 @@ def generate_rows():
         columns.sort()
         for j, column in columns:
             content = '\n'.join(
-                setting.show_name*f"{setting.name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
+                setting.show_name*f"{setting.short_name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
                 for setting in column if setting.get_value(sample) is not None )
             row.append(content)
+        
+        exposure = settings.by_tag('Exposure').get_value(sample)
+        gain = settings.by_tag('Gain').get_value(sample)
+        row.append(f"{exposure} ms,\n{gain} dB")
+        
+        detection_mode = settings.by_tag('DetectionThresholdType').get_value(sample)
+        detection_threshold = settings.by_tag('DetectionThreshold').get_value(sample)
+        if detection_threshold is None:
+            row.append(detection_mode)
+        else:
+            row.append(f"{detection_mode}\n{detection_threshold}")
         
         framerate = settings.by_tag('FrameRate').get_value(sample)
         frames_per_video = settings.by_tag('FramesPerVideo').get_value(sample)
@@ -446,16 +458,11 @@ def generate_rows():
         num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
         row.append(f"{video_duration}x{num_of_videos}")
         
-        detection_mode = settings.by_tag('DetectionThresholdType').get_value(sample)
-        detection_threshold = settings.by_tag('DetectionThreshold').get_value(sample)
-        if detection_threshold is None:            
-            row.append(detection_mode)
-        else:
-            row.append(f"{detection_mode}\n{detection_threshold}")
-        
-        stir_rpm = settings.by_tag('StirrerSpeed').get_value(sample)
         stir_time = settings.by_tag('StirredTime').get_value(sample)
-        row.append(f"{stir_rpm}x{stir_time}")        
+        stir_rpm = settings.by_tag('StirrerSpeed').get_value(sample)
+        row.append(f"{stir_time}x{stir_rpm}")
+        
+        row.append(settings.by_tag('ID').get_value(sample))
         
         time = settings.by_tag('time').get_value(sample)
         elapsed_time = None
