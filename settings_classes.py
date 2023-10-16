@@ -101,7 +101,6 @@ class Settings():
             requirement = depends_on.dependencies_require
             for sample, value in setting.sample_values.items():
                 if depends_on.get_value(sample) != requirement:
-                    # setting.set_value(sample, setting.datatype(0))
                     setting.set_value(sample, None)
     def parse_time(self, sample):
         if 'MeasurementStartDateTime' not in self.tags: return
@@ -118,10 +117,10 @@ class Settings():
         age = (measurement_time - experimental_unit_date).total_seconds() / 86400
         
         if hasattr(experimental_unit, 'age') is False:
-            age_subsetting = Setting('age')
+            age_subsetting = Setting('age', name = 'Age', units = 'days', datatype = float)
             experimental_unit.add_subsetting(age_subsetting, 'age')
-        experimental_unit.age.set_value(sample, f"{age:.1f} d old")
-    def read_files(self, sample: Sample, get_all = False, dependencies: dict = None):
+        experimental_unit.age.set_value(sample, age)
+    def read_files(self, sample: Sample, dependencies: dict = None):
         if dependencies is None: dependencies = dict()
         tags = self.tags
         by_tag = self.by_tag
@@ -129,7 +128,6 @@ class Settings():
         with open(sample.xml) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
-            # for entry in (root.iter() if get_all else root.find('RecordingSettings')):
             for entry in root.iter():
                 tag = entry.tag
                 if tag in tags:

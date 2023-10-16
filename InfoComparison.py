@@ -22,13 +22,11 @@ def compare_info(settings, samples, results_object, output_folder):
         for tag, setting in settings.tags.items():
             if setting.tag == 'Name': continue
             if setting.hidden is False:
-                # yield tag, setting
                 units = setting.units
                 name = setting.name if units == '' else f"{setting.name} ({units})"
                 yield name, setting
             for subtag, subsetting in setting.subsettings.items():
                 if subsetting.hidden: continue
-                # yield f"{tag}.{subtag}", subsetting
                 units = subsetting.units
                 name = subsetting.name if units == '' else f"{subsetting.name} ({units})"
                 yield name, subsetting
