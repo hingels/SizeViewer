@@ -10,7 +10,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from settings_classes import Setting
+from .settings_classes import Setting
 
 
 def compare_info(settings, samples, results_object, output_folder):

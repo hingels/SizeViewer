@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nanotracking"
+version = "0.0.2"
+authors = [
+  { name="Henry Ingels", email="henryingels@gmail.com" },
+]
+description = "Provides visualization and analysis features for nanoparticle tracking analysis (NTA) data, particularly from the Horiba ViewSizer 3000."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "bottle",
+    "os",
+    "shutil",
+    "pandas",
+    "xml",
+    "datetime",
+    "scipy",
+    "collections"
+]
+
+[project.urls]
+Homepage = "https://github.com/hingels/SizeViewer"
+Issues = "https://github.com/hingels/SizeViewer/issues"

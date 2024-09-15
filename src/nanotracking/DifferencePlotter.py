@@ -19,9 +19,9 @@ mpl.rcParams['axes.spines.top'] = False
 mpl.rcParams['axes.spines.left'] = False
 mpl.rcParams['axes.spines.right'] = False
 from matplotlib import pyplot as plt, cm
-from sample_class import Sample
-from settings_classes import Setting, Settings
-from InfoComparison import compare_info
+from .sample_class import Sample
+from .settings_classes import Setting, Settings
+from .InfoComparison import compare_info
 
 
 cumulative_enabled = True

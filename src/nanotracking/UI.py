@@ -1,6 +1,6 @@
 import bottle
 from bottle import route, post, redirect, run, template, BaseTemplate, static_file, request
-from DifferencePlotter import *
+from .DifferencePlotter import *
 
 app = bottle.default_app()
 BaseTemplate.defaults['get_url'] = app.get_url

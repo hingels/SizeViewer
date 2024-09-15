@@ -6,7 +6,7 @@ Created on Sun Oct  1 17:08:22 2023
 @author: henryingels
 """
 
-from sample_class import Sample
+from .sample_class import Sample
 import typing
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
