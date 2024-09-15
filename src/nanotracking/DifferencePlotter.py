@@ -62,14 +62,22 @@ class NTA():
             'top_nm': os.path.join(output_folder, 'top_nm'),
             'fulldata_size_sums': os.path.join(output_folder, 'fulldata_size_sums'),
             'cumulative_sums': os.path.join(output_folder, 'cumulative_sums'),
-            'cumsum_maxima': os.path.join(output_folder, 'cumsum_maxima')
+            'cumsum_maxima': os.path.join(output_folder, 'cumsum_maxima'),
+            'size_differences': os.path.join(output_folder, 'size_differences')#,
+            # 'avg_histograms': os.path.join(output_folder, 'avg_histograms'),
+            # 'total_stds': os.path.join(output_folder, 'total_stds')
         }
         self.results_for_csv = None
         self.sums = []
+        self.need_recompute = True
+        self.need_reprep_tabulation = True
+        # self.need_reconfig_settings = True
         self.configure_settings()
     def enable_table(self, include_experimental_unit, treatments_and_waits, results_column_names, column_names, column_widths, width, margin_minimum_right, margin_left):
         table_settings = locals(); table_settings.pop('self')
         self.table_settings = table_settings
+        self.need_recompute = True
+        self.need_reprep_tabulation = True
     def disable_table(self):
         self.table_settings = None
     def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
@@ -81,14 +89,20 @@ class NTA():
         peak_settings['maxima_candidate_description'] = f": Candidate peaks after smoothing, selected using argrelextrema in SciPy {scipy.__version__}."
         peak_settings['maxima_description'] = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of size {kernel2_size} bins."
         self.peak_settings = peak_settings
+        self.need_recompute = True
+        self.need_reprep_tabulation = True
     def disable_peak_detection(self):
         self.peak_settings = None
     def enable_cumulative(self):
         self.cumulative_enabled = True
+        self.need_recompute = True
+        self.need_reprep_tabulation = True
     def disable_cumulative(self):
         self.cumulative_enabled = False
     def enable_difference(self):
         self.difference_enabled = True
+        self.need_recompute = True
+        self.need_reprep_tabulation = True
     def disable_difference(self):
         self.difference_enabled = False
     def configure_settings(self):
@@ -123,6 +137,7 @@ class NTA():
         settings_list = [*md_settings, *xml_settings]
         settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
         self.settings = settings
+        # self.need_reconfig_settings = False
     def compute(self, prep_tabulation = True):
         peak_settings = self.peak_settings
         peaks_enabled = (peak_settings is not None)
@@ -142,6 +157,7 @@ class NTA():
         sums = self.sums
         bins = None
         all_bins, all_sizes = [], []
+        # total_stds, avg_histograms = [], []
         fulldata_size_sums = []
         for sample in self.samples:
             full_data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
@@ -166,6 +182,18 @@ class NTA():
                 ('All data', fulldata_size_sum*width),
                 (top_nm, np.sum(sizes*width))
             ))
+
+            # videos = sample.videos
+            # all_histograms = np.array([np.histogram(video, bins = bins)[0] for video in videos])
+            # avg_histogram = np.average(all_histograms, axis = 0)
+            # total_std = np.std(all_histograms, axis = 0, ddof = 1)
+            # scale_factor = np.array([sizes[j]/avg if (avg := avg_histogram[j]) != 0 else 0 for j in range(len(sizes)-1)])
+            # error_resizing = 0.1
+            # total_std *= scale_factor * error_resizing
+            # avg_histogram *= scale_factor
+            # total_stds.append(total_std)
+            # avg_histograms.append(avg_histograms)
+
             if peaks_enabled:
                 bin_centers = bins + width/2
                 filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
@@ -198,6 +226,8 @@ class NTA():
         np.save(tmp_filenames['bins'], np.vstack(all_bins))
         np.save(tmp_filenames['sizes'], np.vstack(all_sizes))
         np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
+        # np.save(tmp_filenames['total_stds'], np.vstack(total_stds))
+        # np.save(tmp_filenames['avg_histograms'], np.vstack(avg_histograms))
         if peaks_enabled:
             np.save(tmp_filenames['filtered_sizes'], np.vstack(all_filtered))
             self.maxima = all_maxima
@@ -209,9 +239,11 @@ class NTA():
         if difference_enabled:
             np.save(tmp_filenames['size_differences'], np.vstack(all_size_differences))
         self.overall_min, self.overall_max = overall_min, overall_max
+        self.need_recompute = False
         if prep_tabulation:
             self.prepare_tabulation()
     def prepare_tabulation(self):
+        # assert self.need_reconfig_settings == False, "Must run NTA.configure_settings() first."
         sums = self.sums
         table_settings, settings, num_of_plots, samples, unordered_samples = self.table_settings, self.settings, self.num_of_plots, self.samples, self.unordered_samples
         table_enabled = (table_settings is not None)
@@ -378,16 +410,23 @@ class NTA():
                 row.append("")
                 yield row
         self.rows, self.results_for_csv = tuple(generate_rows()), results_for_csv
+        self.need_reprep_tabulation = False
     def compare(self):
+        assert self.need_recompute == False, "Must run NTA.compute() first."
+        assert self.need_reprep_tabulation == False, "Must run NTA.prepare_tabulation() first."
         compare_info(self.settings, self.samples, self.results_for_csv, self.output_folder)
     def plot(self, grid_color = '0.8'):
-        num_of_plots, samples, colors, table_settings, peak_settings, unordered_samples, overall_min, overall_max, output_folder, settings = self.num_of_plots, self.samples, self.colors, self.table_settings, self.peak_settings, self.unordered_samples, self.overall_min, self.overall_max, self.output_folder, self.settings
+        assert self.need_recompute == False, "Must run NTA.compute() first."
+        num_of_plots, samples, colors, table_settings, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table_settings, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
         peaks_enabled = (peak_settings is not None)
         table_enabled = (table_settings is not None)
+        if table_enabled:
+            assert self.need_reprep_tabulation == False, "Must run NTA.prepare_tabulation() first."
         cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
         (_, height) = self.figsize
         tmp_filenames = self.tmp_filenames
         all_bins, all_sizes = np.load(tmp_filenames['bins']+'.npy'), np.load(tmp_filenames['sizes']+'.npy')
+        # avg_histograms, total_stds = np.load(tmp_filenames['avg_histograms']+'.npy'), np.load(tmp_filenames['total_stds']+'.npy')
         if peaks_enabled:
             rejected_maxima_marker, maxima_marker, filter_description, maxima_candidate_description, maxima_description = peak_settings['rejected_maxima_marker'], peak_settings['maxima_marker'], peak_settings['filter_description'], peak_settings['maxima_candidate_description'], peak_settings['maxima_description']
             all_filtered = np.load(tmp_filenames['filtered_sizes']+'.npy')
@@ -413,19 +452,20 @@ class NTA():
             bins, sizes = all_bins[i], all_sizes[i]
             width = bins[1] - bins[0]
             bin_centers = bins + width/2
+            # avg_histogram, total_std = avg_histograms[i], total_stds[i]
             
             plt.sca(ax)
             plt.bar(bins, sizes, width = width, color = colors[i], alpha = 0.7, align = 'edge')
             
             if peaks_enabled:
                 filtered, maxima, rejected_candidates = all_filtered[i], all_maxima[i], all_rejected[i]
-                plt.plot(bins, filtered, linewidth = 0.5)
+                plt.plot(bins, filtered, linewidth = 0.5, color = 'black')
                 if len(rejected_candidates) != 0:
                     plt.plot(bin_centers[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
                 plt.plot(bin_centers[maxima], filtered[maxima], **maxima_marker)
             
             if difference_enabled and i != 0:
-                size_differences = all_size_differences[i]
+                size_differences = all_size_differences[i+1]
                 plt.bar(bins, size_differences, width = width, color = 'black', alpha = 0.3, align = 'edge')
             
             videos = sample.videos
@@ -433,10 +473,11 @@ class NTA():
             avg_histogram = np.average(all_histograms, axis = 0)
             total_std = np.std(all_histograms, axis = 0, ddof = 1)
             scale_factor = np.array([sizes[j]/avg if (avg := avg_histogram[j]) != 0 else 0 for j in range(len(sizes)-1)])
-            
             error_resizing = 0.1
-            errorbars = np.array(list(zip((scale_factor*total_std)*error_resizing, [0]*len(total_std)))).T
-            plt.errorbar(bin_centers[:-1], scale_factor*avg_histogram, yerr = errorbars, elinewidth = 1, linestyle = '', marker = '.', ms = 1, alpha = 0.5, color = 'black')            
+            total_std *= scale_factor * error_resizing
+            avg_histogram *= scale_factor
+            errorbars = np.array(list(zip(total_std, [0]*len(total_std)))).T
+            plt.errorbar(bin_centers[:-1], avg_histogram, yerr = errorbars, elinewidth = 1, linestyle = '', marker = '.', ms = 1, alpha = 0.5, color = 'black')            
             
             plt.xlim(0, x_lim)
             plt.ylim(overall_min, overall_max)

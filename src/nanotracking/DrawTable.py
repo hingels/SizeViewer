@@ -6,16 +6,12 @@ def draw_table(fig, ax, rows, edges, table_settings, grid_color):
     right_edge_figure = edges['right']
     table_bottom = edges['bottom']
     table_top = edges['top']
-    
     column_names = table_settings['column_names']
     column_widths = table_settings['column_widths']
     table_width = table_settings['width']
     margin_minimum_right = table_settings['margin_minimum_right']
     margin_left = table_settings['margin_left']
-
     transFigure = fig.transFigure
-
-    
     
     width_sum = sum([col_width for name, col_width in zip(column_names, column_widths) if name != ''])
     margin_right = table_width - width_sum
@@ -24,7 +20,6 @@ def draw_table(fig, ax, rows, edges, table_settings, grid_color):
     column_names.append("")
     # display_coords = final_ax.transData.transform([0, overall_min])
     edge = right_edge_figure + margin_left
-    # table = plt.table(
     table = ax.table(
         rows,
         bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]),
