@@ -34,7 +34,6 @@ grid_proportion_of_figure = 0.9
 text_shift = 0.05
                     
 class NTA():
-    # def __init__(self, datafolder, output_folder, filenames, tmp_filepath = 'tmp.bin'):
     def __init__(self, datafolder, output_folder, filenames):
         self.datafolder, self.output_folder, self.filenames = datafolder, output_folder, filenames
         os.makedirs(output_folder, exist_ok = True)
@@ -52,21 +51,22 @@ class NTA():
         height = min(np.floor(65536/resolution), height)
         self.figsize = (width, height)
         self.colors = cm.plasma(np.linspace(0, 1, num_of_plots))
-        # self.unordered_samples, self.samples, self.num_of_plots, self.tmp_filepath = unordered_samples, samples, num_of_plots, tmp_filepath
         self.unordered_samples, self.samples, self.num_of_plots = unordered_samples, samples, num_of_plots
         self.overall_min, self.overall_max = None, None
         self.maxima, self.rejected_maxima = None, None
+        self.settings = None
         self.tmp_filenames = {
             'bins': os.path.join(output_folder, 'bins'),
             'sizes': os.path.join(output_folder, 'sizes'),
             'filtered_sizes': os.path.join(output_folder, 'filtered_sizes'),
-            # 'maxima': os.path.join(output_folder, 'maxima'),
-            # 'rejected_maxima': os.path.join(output_folder, 'rejected_maxima'),
             'top_nm': os.path.join(output_folder, 'top_nm'),
             'fulldata_size_sums': os.path.join(output_folder, 'fulldata_size_sums'),
             'cumulative_sums': os.path.join(output_folder, 'cumulative_sums'),
             'cumsum_maxima': os.path.join(output_folder, 'cumsum_maxima')
         }
+        self.results_for_csv = None
+        self.sums = []
+        self.configure_settings()
     def enable_table(self, include_experimental_unit, treatments_and_waits, results_column_names, column_names, column_widths, width, margin_minimum_right, margin_left):
         table_settings = locals(); table_settings.pop('self')
         self.table_settings = table_settings
@@ -91,12 +91,44 @@ class NTA():
         self.difference_enabled = True
     def disable_difference(self):
         self.difference_enabled = False
-    def compute(self):
+    def configure_settings(self):
+        previous_setting = Setting('previous', name = 'Previous')
+        md_settings = [
+            Setting('experimental_unit', name = 'Experimental unit'),#, column = 0),
+            Setting('treatment', name = 'Treatment', units = 'µM'),
+            Setting('wait', name = 'Wait', units = 'h'),
+            Setting('filter', name = 'Filter cut-on', units = 'nm', column = 1),
+            previous_setting ]
+        red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
+        green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
+        blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
+        detection_threshold_setting = Setting('DetectionThresholdType', name = 'Detection mode', dependencies_require = 'Manual')
+        xml_settings = [
+            Setting('RedLaserPower', short_name = '635nm', name = '635nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = red_enabled),
+            red_enabled,
+            Setting('GreenLaserPower', short_name = '520nm', name = '520nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = green_enabled),
+            green_enabled,
+            Setting('BlueLaserPower', short_name = '445nm', name = '445nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = blue_enabled),
+            blue_enabled,
+            Setting('Exposure', units = 'ms', datatype = int),
+            Setting('Gain', units = 'dB', datatype = int),
+            Setting('MeasurementStartDateTime'),#, column = 5),
+            Setting('FrameRate', name = 'Framerate', units = 'fps', datatype = int),
+            Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
+            Setting('NumOfVideos', name = 'Number of videos', datatype = int),
+            Setting('StirrerSpeed', name = 'Stirring speed', units = 'rpm', datatype = int),
+            Setting('StirredTime', name = 'Stirred time', units = 's', datatype = int),
+            detection_threshold_setting,
+            Setting('DetectionThreshold', name = 'Detection threshold', datatype = float, depends_on = detection_threshold_setting) ]
+        settings_list = [*md_settings, *xml_settings]
+        settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
+        self.settings = settings
+    def compute(self, prep_tabulation = True):
         peak_settings = self.peak_settings
         peaks_enabled = (peak_settings is not None)
         if peaks_enabled:
             lowpass_filter, kernel2_size, second_derivative_threshold = peak_settings['lowpass_filter'], peak_settings['kernel2_size'], peak_settings['second_derivative_threshold']
-            all_filtered, all_maxima, all_rejected, all_top_nm, fulldata_size_sums = [], [], [], [], []
+            all_filtered, all_maxima, all_rejected, all_top_nm,  = [], [], [], []
         cumulative_enabled = self.cumulative_enabled
         if cumulative_enabled:
             cumulative_sums = []
@@ -107,8 +139,10 @@ class NTA():
 
         overall_min, overall_max = 0, 0
         previous_sizes = None
+        sums = self.sums
         bins = None
         all_bins, all_sizes = [], []
+        fulldata_size_sums = []
         for sample in self.samples:
             full_data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
             data = full_data.iloc[:num_data_points, :]
@@ -123,9 +157,15 @@ class NTA():
             bins = new_bins
             sizes = data['PSD_corrected_[counts/mL/nm]']
             width = bins[1] - bins[0]
+            fulldata_size_sum = np.sum(full_data['PSD_corrected_[counts/mL/nm]'])
             
             all_bins.append(bins)
             all_sizes.append(sizes)
+            fulldata_size_sums.append(fulldata_size_sum)
+            sums.append((
+                ('All data', fulldata_size_sum*width),
+                (top_nm, np.sum(sizes*width))
+            ))
             if peaks_enabled:
                 bin_centers = bins + width/2
                 filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
@@ -141,7 +181,6 @@ class NTA():
                 all_maxima.append(maxima)
                 all_rejected.append(rejected_candidates)
                 all_top_nm.append(top_nm)
-                fulldata_size_sums.append(np.sum(full_data['PSD_corrected_[counts/mL/nm]']))
             if cumulative_enabled:
                 cumulative_sum = np.cumsum(sizes)*width
                 cumulative_sums.append(cumulative_sum)
@@ -154,67 +193,221 @@ class NTA():
             overall_max = max(sizes.max(), overall_max)
             overall_min = min(sizes.min(), overall_min)
             previous_sizes = sizes
-        # self.bins, self.sizes, self.filtered, self.maxima, self.rejected_candidates = all_bins, all_sizes, all_filtered, all_maxima, all_rejected
         
-        # arr = np.vstack([all_bins, all_sizes, all_filtered, all_maxima, all_rejected]).astype('d')
-        # arr.tofile(self.tmp_filepath)
-        # np.hstack(all_bins).astype('d').tofile('bins')
-        # np.hstack(all_sizes).astype('d').tofile('sizes')
-        # np.hstack(all_filtered).astype('d').tofile('filtered_sizes')
-        # np.hstack(all_maxima).astype('d').tofile('maxima')
-        # np.hstack(all_rejected).astype('d').tofile('rejected_maxima')
         tmp_filenames = self.tmp_filenames
         np.save(tmp_filenames['bins'], np.vstack(all_bins))
         np.save(tmp_filenames['sizes'], np.vstack(all_sizes))
+        np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
         if peaks_enabled:
             np.save(tmp_filenames['filtered_sizes'], np.vstack(all_filtered))
-            # np.save(tmp_filenames['maxima'], np.vstack(all_maxima))
-            # np.save(tmp_filenames['rejected_maxima'], np.vstack(all_rejected))
             self.maxima = all_maxima
             self.rejected_maxima = all_rejected
             np.save(tmp_filenames['top_nm'], np.vstack(all_top_nm))
-            np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
         if cumulative_enabled:
             np.save(tmp_filenames['cumulative_sums'], np.vstack(cumulative_sums))
             np.save(tmp_filenames['cumsum_maxima'], cumsum_maxima)
         if difference_enabled:
             np.save(tmp_filenames['size_differences'], np.vstack(all_size_differences))
         self.overall_min, self.overall_max = overall_min, overall_max
-    # def compare(self, )
-    # def plot(self, grid_color = '0.8'):
-    #     mpl.rcParams["figure.figsize"] = self.figsize
+        if prep_tabulation:
+            self.prepare_tabulation()
+    def prepare_tabulation(self):
+        sums = self.sums
+        table_settings, settings, num_of_plots, samples, unordered_samples = self.table_settings, self.settings, self.num_of_plots, self.samples, self.unordered_samples
+        table_enabled = (table_settings is not None)
+        if table_enabled:
+            column_widths = table_settings['column_widths']
+            column_names = table_settings['column_names']
+            include_treatments = ('_treatments_waits' in column_names)
+            include_experimental_unit = table_settings['include_experimental_unit']
+            treatments_and_waits = table_settings['treatments_and_waits']
+            results_column_names = table_settings['results_column_names']
+        previous_setting = settings.by_tag('previous')
+        
+        results_for_csv = Setting('_results')
+        def generate_rows():
+            column_quantities = dict()
+            def number_of_subtags(tag):
+                if (setting := settings.by_tag(tag)) is None: return 0
+                return max(len(setting.subsettings), 1)
+            def get_multivalued(tag, sample):
+                if (setting := settings.by_tag(tag)) is None: return []
+                if len(setting.subsettings) == 0:
+                    value = setting.get_value(sample)
+                    if value is None: return []
+                    return [value]
+                subsettings = list(setting.numbered_subsettings.items())
+                subsettings.sort()
+                values = [subsetting.get_value(sample) for _, subsetting in subsettings]
+                if values[0] is None:
+                    values[0] = setting.get_value(sample)
+                return values
+            top_nm = None
+            for i in range(num_of_plots):
+                sample = samples[i]
+                settings.read_files(sample)
+                settings.parse_time(sample)
+                if table_enabled and include_treatments:
+                    for tag in ('treatment', 'wait'):
+                        quantity = number_of_subtags(tag)
+                        if tag not in column_quantities:
+                            column_quantities[tag] = quantity
+                            continue
+                        column_quantities[tag] = max(column_quantities[tag], quantity)
+                data_sums = sums[i]
+                assert len(data_sums) == 2
+                if top_nm is None:
+                    top_nm, _ = data_sums[1]
+                assert data_sums[1][0] == top_nm
+            if table_enabled:
+                for i, name in enumerate(column_names):
+                    if '{top_nm}' in name:
+                        column_names[i] = name.format(top_nm = top_nm)
+                    elif name == '_treatments_waits':
+                        column_names.pop(i)
+                        num_of_treatments = column_quantities['treatment']
+                        num_of_waits = column_quantities['wait']
+                        treatment_column_name, treatment_column_width = treatments_and_waits[0]
+                        wait_column_name, wait_column_width = treatments_and_waits[1]
+                        index = 0
+                        for j in range(max(num_of_treatments, num_of_waits)):
+                            if j < num_of_treatments:
+                                column_names.insert(i + index, treatment_column_name.format(treatment_number = j + 1))
+                                column_widths.insert(i + index, treatment_column_width)
+                                index += 1
+                            if j < num_of_waits:
+                                column_names.insert(i + index, wait_column_name.format(wait_number = j + 1))
+                                column_widths.insert(i + index, wait_column_width)
+                                index += 1
+                for i, name in enumerate(results_column_names):     # This is redundant; should find a better way.
+                    if '{top_nm}' in name:
+                        results_column_names[i] = name.format(top_nm = top_nm)
+            
+            results_for_csv.add_subsetting(previous_setting, 'previous')
+            results_for_csv.add_subsetting(Setting("Time since previous (s)"), 'time_since_previous')
+            results_for_csv.add_subsetting(Setting(f"Concentration\n<{top_nm}nm\n(counts/mL)"), 'total_conc_under_topnm')
+            results_for_csv.add_subsetting(Setting("Concentration\n(counts/mL)"), 'total_conc')
+                
+            time_of_above = None
+            for i in range(num_of_plots):
+                row = []
+                sample = samples[i]
+                if table_enabled:
+                    if include_treatments:
+                        treatments = get_multivalued('treatment', sample)
+                        waits = get_multivalued('wait', sample)
+                        for j in range( max(column_quantities['treatment'], column_quantities['wait']) ):
+                            if j < len(treatments): row.append(treatments[j])
+                            elif j < column_quantities['treatment']: row.append(None)
+                            if j < len(waits): row.append(waits[j])
+                            elif j < column_quantities['wait']: row.append(None)
+                    if include_experimental_unit:
+                        experimental_unit = settings.by_tag('experimental_unit')
+                        text = ''
+                        if experimental_unit is not None:
+                            value = experimental_unit.get_value(sample)
+                            text += value if value is not None else ''
+                            if hasattr(experimental_unit, 'age'):
+                                age = experimental_unit.age.get_value(sample)
+                                text += f"\n{age:.1f} d old" if age is not None else ''
+                        row.append(text)        
+                columns = list(settings.columns.items())
+                columns.sort()
+                for j, column in columns:
+                    content = '\n'.join(
+                        setting.show_name*f"{setting.short_name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
+                        for setting in column if setting.get_value(sample) is not None )
+                    row.append(content)
+                exposure = settings.by_tag('Exposure').get_value(sample)
+                gain = settings.by_tag('Gain').get_value(sample)
+                row.append(f"{exposure} ms,\n{gain} dB")
+                detection_mode = settings.by_tag('DetectionThresholdType').get_value(sample)
+                detection_threshold = settings.by_tag('DetectionThreshold').get_value(sample)
+                if detection_threshold is None:
+                    row.append(detection_mode)
+                else:
+                    row.append(f"{detection_mode}\n{detection_threshold}")
+                framerate = settings.by_tag('FrameRate').get_value(sample)
+                frames_per_video = settings.by_tag('FramesPerVideo').get_value(sample)
+                video_duration = frames_per_video / framerate
+                if video_duration.is_integer():
+                    video_duration = int(video_duration)        
+                num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
+                row.append(f"{video_duration}x{num_of_videos}")
+                stir_time = settings.by_tag('StirredTime').get_value(sample)
+                stir_rpm = settings.by_tag('StirrerSpeed').get_value(sample)
+                row.append(f"{stir_time}x{stir_rpm}")
+                ID = settings.by_tag('ID').get_value(sample)
+                row.append('\n'.join((ID[0:4], ID[4:8], ID[8:12])))
+                
+                text = []
+                time = settings.by_tag('time').get_value(sample)
+                time_since_above = None
+                if time_of_above is not None:
+                    time_since_above = int((time - time_of_above).total_seconds())
+                    text.append(f"{time_since_above} since above")
+                time_of_above = time
 
-    def run_program(self, grid_color = '0.8'):
-        # num_of_plots, samples, colors, peak_settings, unordered_samples, tmp_filepath = self.num_of_plots, self.samples, self.colors, self.peak_settings, self.unordered_samples, self.tmp_filepath
-        num_of_plots, samples, colors, table_settings, peak_settings, unordered_samples, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table_settings, self.peak_settings, self.unordered_samples, self.overall_min, self.overall_max, self.output_folder
-        # all_bins, all_sizes, all_filtered, all_maxima, all_rejected = self.bins, self.sizes, self.filtered, self.maxima, self.rejected_candidates
+                previous = settings.by_tag('previous').get_value(sample)
+                results_for_csv.previous.set_value(sample, previous)
+                ID_of_previous = None
+                time_since_previous = None
+                if previous is not None:
+                    if previous not in unordered_samples:
+                        time_since_previous = '?'
+                    else:
+                        previous_sample = unordered_samples[previous]
+                        ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
+                        time_of_previous = settings.by_tag('time').get_value(previous_sample)
+                        time_since_previous = int((time - time_of_previous).total_seconds())
+                    text.append(f"{time_since_previous} since previous")
+                results_for_csv.time_since_previous.set_value(sample, time_since_previous)
+
+                if ID_of_previous is not None:
+                    ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
+                row.append(ID_of_previous)
+                row.append('\n'.join(text))
+                text.clear()
+                
+                data_sums = sums[i]
+                text.append(f"Total: {data_sums[1][1]:.2E}")
+                results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
+                text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
+                results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
+                row.append('\n'.join(text))
+                row.append("")
+                yield row
+        self.rows, self.results_for_csv = tuple(generate_rows()), results_for_csv
+    def compare(self):
+        compare_info(self.settings, self.samples, self.results_for_csv, self.output_folder)
+    def plot(self, grid_color = '0.8'):
+        num_of_plots, samples, colors, table_settings, peak_settings, unordered_samples, overall_min, overall_max, output_folder, settings = self.num_of_plots, self.samples, self.colors, self.table_settings, self.peak_settings, self.unordered_samples, self.overall_min, self.overall_max, self.output_folder, self.settings
         peaks_enabled = (peak_settings is not None)
         table_enabled = (table_settings is not None)
         cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
         (_, height) = self.figsize
-        rejected_maxima_marker, maxima_marker, filter_description, maxima_candidate_description, maxima_description = peak_settings['rejected_maxima_marker'], peak_settings['maxima_marker'], peak_settings['filter_description'], peak_settings['maxima_candidate_description'], peak_settings['maxima_description']
         tmp_filenames = self.tmp_filenames
         all_bins, all_sizes = np.load(tmp_filenames['bins']+'.npy'), np.load(tmp_filenames['sizes']+'.npy')
         if peaks_enabled:
+            rejected_maxima_marker, maxima_marker, filter_description, maxima_candidate_description, maxima_description = peak_settings['rejected_maxima_marker'], peak_settings['maxima_marker'], peak_settings['filter_description'], peak_settings['maxima_candidate_description'], peak_settings['maxima_description']
             all_filtered = np.load(tmp_filenames['filtered_sizes']+'.npy')
-            # all_maxima = np.load(tmp_filenames['maxima']+'.npy')
-            # all_rejected = np.load(tmp_filenames['rejected_maxima']+'.npy')
             all_maxima, all_rejected = self.maxima, self.rejected_maxima
-            all_top_nm = np.load(tmp_filenames['top_nm']+'.npy')
-            fulldata_size_sums = np.load(tmp_filenames['fulldata_size_sums']+'.npy')
         if cumulative_enabled:
             cumulative_sums = np.load(tmp_filenames['cumulative_sums']+'.npy')
             cumsum_maxima = np.load(tmp_filenames['cumsum_maxima']+'.npy')
+            max_of_cumulative_sums = cumsum_maxima.max()
+            cumulative_sum_scaling = overall_max / max_of_cumulative_sums
         if difference_enabled:
             all_size_differences = np.load(tmp_filenames['size_differences']+'.npy')
 
+        mpl.rcParams["figure.figsize"] = self.figsize
         fig, axs = plt.subplots(num_of_plots, 1)
         fig.subplots_adjust(hspace=-0.05*height)
         transFigure = fig.transFigure
+        transFigure_inverted = transFigure.inverted()
 
         final_i = num_of_plots - 1
-        sums = []
-        bins = None
+        origins = []
         for i, ax in enumerate(axs):
             sample = samples[i]
             bins, sizes = all_bins[i], all_sizes[i]
@@ -226,25 +419,13 @@ class NTA():
             
             if peaks_enabled:
                 filtered, maxima, rejected_candidates = all_filtered[i], all_maxima[i], all_rejected[i]
+                plt.plot(bins, filtered, linewidth = 0.5)
                 if len(rejected_candidates) != 0:
                     plt.plot(bin_centers[rejected_candidates], filtered[rejected_candidates], **rejected_maxima_marker)
                 plt.plot(bin_centers[maxima], filtered[maxima], **maxima_marker)
-            if table_enabled:
-                # full_data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
-                # sums.append((
-                #     ('All data', np.sum(full_data['PSD_corrected_[counts/mL/nm]'])*width),
-                #     (top_nm, np.sum(sizes*width))
-                # ))
-                top_nm = all_top_nm[i]
-                fulldata_size_sum = fulldata_size_sums[i]
-                sums.append((
-                    ('All data', fulldata_size_sum*width),
-                    (top_nm, np.sum(sizes*width))
-                ))
             
             if difference_enabled and i != 0:
                 size_differences = all_size_differences[i]
-                # plt.bar(bins, size_differences, width = width, color = 'black', alpha = 0.3, align = 'center')
                 plt.bar(bins, size_differences, width = width, color = 'black', alpha = 0.3, align = 'edge')
             
             videos = sample.videos
@@ -258,6 +439,7 @@ class NTA():
             plt.errorbar(bin_centers[:-1], scale_factor*avg_histogram, yerr = errorbars, elinewidth = 1, linestyle = '', marker = '.', ms = 1, alpha = 0.5, color = 'black')            
             
             plt.xlim(0, x_lim)
+            plt.ylim(overall_min, overall_max)
             ax.patch.set_alpha(0)
                 
             if i == final_i:
@@ -265,24 +447,15 @@ class NTA():
                 plt.xlabel("Diameter (nm)")
                 plt.ticklabel_format(style = 'sci', axis = 'y', scilimits = (0, 0))
                 ax.spines.left.set_visible(True)
-                break
-            plt.yticks([])
-            plt.xticks([])
-            
-        if cumulative_enabled:
-            max_of_cumulative_sums = cumsum_maxima.max()
-            cumulative_sum_scaling = overall_max / max_of_cumulative_sums
-
-        origins = []
-        for i, ax in enumerate(axs):
-            plt.sca(ax)
-            plt.ylim(overall_min, overall_max)
-            if i == final_i:
                 plt.axhline(0, color = 'black')
+                break
             else:
                 ax.spines['bottom'].set_position(('data', 0))
+            plt.yticks([])
+            plt.xticks([])
+
             origin_transDisplay = ax.transData.transform([0, 0])
-            origins.append(transFigure.inverted().transform(origin_transDisplay))
+            origins.append(transFigure_inverted.transform(origin_transDisplay))
             
             if cumulative_enabled:
                 cumulative_sum = cumulative_sums[i]
@@ -291,13 +464,14 @@ class NTA():
         final_ax = ax   # Using the ax from the final (bottom) plot:
         final_ax.xaxis.set_tick_params(width = 2)
         final_ax.yaxis.set_tick_params(width = 2)
+        transData = final_ax.transData
         tick_values, tick_labels = plt.xticks()
-        final_i = len(tick_values) - 1
 
+        final_i = len(tick_values) - 1
         right_edge_figure = None
         for i, tick_value in enumerate(tick_values):
-            display_coords = final_ax.transData.transform([tick_value, overall_min])
-            figure_x, figure_y = transFigure.inverted().transform(display_coords)
+            display_coords = transData.transform([tick_value, overall_min])
+            figure_x, figure_y = transFigure_inverted.transform(display_coords)
             
             line = plt.Line2D([figure_x, figure_x], [figure_y, grid_proportion_of_figure], lw = 1, color = grid_color, transform = transFigure, zorder = 0)
             fig.add_artist(line)
@@ -335,48 +509,12 @@ class NTA():
         text_y -= 0.04
         plt.text(0, text_y, " ", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
-
-        previous_setting = Setting('previous', name = 'Previous')
-        md_settings = [
-            Setting('experimental_unit', name = 'Experimental unit'),#, column = 0),
-            Setting('treatment', name = 'Treatment', units = 'µM'),
-            Setting('wait', name = 'Wait', units = 'h'),
-            Setting('filter', name = 'Filter cut-on', units = 'nm', column = 1),
-            previous_setting ]
-        red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
-        green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
-        blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
-        detection_threshold_setting = Setting('DetectionThresholdType', name = 'Detection mode', dependencies_require = 'Manual')
-        xml_settings = [
-            Setting('RedLaserPower', short_name = '635nm', name = '635nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = red_enabled),
-            red_enabled,
-            Setting('GreenLaserPower', short_name = '520nm', name = '520nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = green_enabled),
-            green_enabled,
-            Setting('BlueLaserPower', short_name = '445nm', name = '445nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = blue_enabled),
-            blue_enabled,
-            Setting('Exposure', units = 'ms', datatype = int),
-            Setting('Gain', units = 'dB', datatype = int),
-            Setting('MeasurementStartDateTime'),#, column = 5),
-            Setting('FrameRate', name = 'Framerate', units = 'fps', datatype = int),
-            Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
-            Setting('NumOfVideos', name = 'Number of videos', datatype = int),
-            Setting('StirrerSpeed', name = 'Stirring speed', units = 'rpm', datatype = int),
-            Setting('StirredTime', name = 'Stirred time', units = 's', datatype = int),
-            detection_threshold_setting,
-            Setting('DetectionThreshold', name = 'Detection threshold', datatype = float, depends_on = detection_threshold_setting) ]
-        settings_list = [*md_settings, *xml_settings]
-        settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
-
-        results_for_csv = Setting('_results')
-        compare_info(settings, samples, results_for_csv, output_folder)
-
         if table_enabled:
             axis_positions = [origin[1] for origin in origins]
             cell_height = axis_positions[0] - axis_positions[1]
             table_top = axis_positions[0] + 0.5*cell_height
             table_bottom = axis_positions[-1] - 0.5*cell_height
-            results_for_table = results_for_csv
             edges = {'right': right_edge_figure, 'bottom': table_bottom, 'top': table_top}
-            draw_table(fig, ax, settings, previous_setting, samples, unordered_samples, sums, results_for_table, edges, table_settings, grid_color)
+            draw_table(fig, ax, self.rows, edges, table_settings, grid_color)
 
         fig.savefig(f"{output_folder}/Ridgeline plot.png", dpi = 300, bbox_inches='tight')
