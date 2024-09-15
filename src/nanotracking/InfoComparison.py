@@ -14,8 +14,6 @@ from .settings_classes import Setting
 
 
 def compare_info(settings, samples, results_object, output_folder):
-    os.makedirs(output_folder, exist_ok = True)
-    
     blank = Setting('')
     
     def generate_setting_objects():

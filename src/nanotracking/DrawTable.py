@@ -2,19 +2,24 @@ import matplotlib as mpl
 from .settings_classes import Setting
 
 
-def draw_table(fig, ax, settings, previous_setting, samples, unordered_samples, sums, treatments_and_waits, results_for_table, results_column_names, column_names, column_widths, edges, table_settings, grid_color, include_treatments, include_experimental_unit):
+def draw_table(fig, ax, settings, previous_setting, samples, unordered_samples, sums, results_for_table, edges, table_settings, grid_color):
     right_edge_figure = edges['right']
     table_bottom = edges['bottom']
     table_top = edges['top']
     
+    include_experimental_unit = table_settings['include_experimental_unit']
+    treatments_and_waits = table_settings['treatments_and_waits']
+    results_column_names = table_settings['results_column_names']
+    column_names = table_settings['column_names']
+    column_widths = table_settings['column_widths']
     table_width = table_settings['width']
-    margins = table_settings['margins']
-    minimum_table_right_margin = margins['minimum_right']
-    table_left_margin = margins['left']
+    margin_minimum_right = table_settings['margin_minimum_right']
+    margin_left = table_settings['margin_left']
 
     transFigure = fig.transFigure
 
-    # def generate_rows(settings, samples, unordered_samples, sums, column_names, column_widths, include_treatments, include_experimental_unit, treatments_and_waits, results_column_names, results_for_table, previous_setting):
+    include_treatments = ('_treatments_waits' in column_names)
+
     def generate_rows():
         num_of_plots = len(samples)
         
@@ -79,6 +84,7 @@ def draw_table(fig, ax, settings, previous_setting, samples, unordered_samples, 
                         column_names.insert(i + index, wait_column_name.format(wait_number = j + 1))
                         column_widths.insert(i + index, wait_column_width)
                         index += 1
+
         for i, name in enumerate(results_column_names):     # This is redundant; should find a better way.
             if '{top_nm}' in name:
                 results_column_names[i] = name.format(top_nm = top_nm)
@@ -192,12 +198,12 @@ def draw_table(fig, ax, settings, previous_setting, samples, unordered_samples, 
             yield row
     
     width_sum = sum([col_width for name, col_width in zip(column_names, column_widths) if name != ''])
-    table_right_margin = table_width - width_sum
-    assert table_right_margin >= minimum_table_right_margin, f"table_right_margin = {table_right_margin} < minimum_table_right_margin = {minimum_table_right_margin}."
-    column_widths.append(table_right_margin)
+    margin_right = table_width - width_sum
+    assert margin_right >= margin_minimum_right, f"margin_right = {margin_right} < margin_minimum_right = {margin_minimum_right}."
+    column_widths.append(margin_right)
     column_names.append("")
     # display_coords = final_ax.transData.transform([0, overall_min])
-    edge = right_edge_figure + table_left_margin
+    edge = right_edge_figure + margin_left
     # table = plt.table(
     table = ax.table(
         tuple(generate_rows()),
