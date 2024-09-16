@@ -1,0 +1,34 @@
+Metadata-Version: 2.1
+Name: nanotracking
+Version: 0.0.52
+Summary: Provides visualization and analysis features for nanoparticle tracking analysis (NTA) data, particularly from the Horiba ViewSizer 3000.
+Author-email: Henry Ingels <henryingels@gmail.com>
+Project-URL: Homepage, https://github.com/hingels/SizeViewer
+Project-URL: Issues, https://github.com/hingels/SizeViewer/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: bottle
+Requires-Dist: os
+Requires-Dist: shutil
+Requires-Dist: pandas
+Requires-Dist: xml
+Requires-Dist: datetime
+Requires-Dist: scipy
+Requires-Dist: collections
+
+# SizeViewer
+Creates graphics and tables from ViewSizer 3000 .dat files for easy comparison of parameters and measurements.
+
+![Example graphic](Example.png)
+
+# How to use
+1. Install Anaconda.
+2. Create a new `conda` environment, then within it, install NumPy, SciPy, Pandas, and Matplotlib. (Future updates will include an importable `conda` environment.)
+3. Open DifferencePlotter.py in a code editor and adjust the settings, beginning at line 28. (This will soon be replaced with a more user-friendly process.)
+4. Run DifferencePlotter.py, which will output .csv files into a "CSV outputs" folder in its parent directory and display a graphic.

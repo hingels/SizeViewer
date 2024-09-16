@@ -1,0 +1,17 @@
+LICENSE
+README.md
+pyproject.toml
+src/nanotracking/DifferencePlotter.py
+src/nanotracking/DrawTable.py
+src/nanotracking/InfoComparison.py
+src/nanotracking/SetUpFolders.py
+src/nanotracking/UI (deprecated).py
+src/nanotracking/__init__.py
+src/nanotracking/data_handler.c
+src/nanotracking/sample_class.py
+src/nanotracking/settings_classes.py
+src/nanotracking.egg-info/PKG-INFO
+src/nanotracking.egg-info/SOURCES.txt
+src/nanotracking.egg-info/dependency_links.txt
+src/nanotracking.egg-info/requires.txt
+src/nanotracking.egg-info/top_level.txt

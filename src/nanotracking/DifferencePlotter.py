@@ -23,6 +23,7 @@ from .sample_class import Sample
 from .settings_classes import Setting, Settings
 from .InfoComparison import compare_info
 from .DrawTable import draw_table
+from nanotracking import data_handler
 
 volume = 2.3E-06
 x_lim = 400
@@ -172,6 +173,8 @@ class NTA():
                 assert np.all(new_bins == bins) == True, 'Unequal sequence of bins between samples detected!'
             bins = new_bins
             sizes = data['PSD_corrected_[counts/mL/nm]']
+            # data_handler.parse_data(bins, sizes, os.path.join(self.output_folder, 'Something.txt', num_data_points))
+            data_handler.parse_data(something = 100)
             width = bins[1] - bins[0]
             fulldata_size_sum = np.sum(full_data['PSD_corrected_[counts/mL/nm]'])
             
@@ -465,7 +468,7 @@ class NTA():
                 plt.plot(bin_centers[maxima], filtered[maxima], **maxima_marker)
             
             if difference_enabled and i != 0:
-                size_differences = all_size_differences[i+1]
+                size_differences = all_size_differences[i-1]
                 plt.bar(bins, size_differences, width = width, color = 'black', alpha = 0.3, align = 'edge')
             
             videos = sample.videos

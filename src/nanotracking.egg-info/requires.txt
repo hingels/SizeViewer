@@ -1,0 +1,10 @@
+numpy
+matplotlib
+bottle
+os
+shutil
+pandas
+xml
+datetime
+scipy
+collections
