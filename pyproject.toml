@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nanotracking"
-version = "0.0.52"
+version = "0.0.1"
 authors = [
   { name="Henry Ingels", email="henryingels@gmail.com" },
 ]
@@ -27,11 +27,6 @@ dependencies = [
     "datetime",
     "scipy",
     "collections"
-]
-
-[tool.setuptools]
-ext-modules = [
-  {name = "nanotracking.data_handler", sources = ["src/nanotracking/data_handler.c"]}
 ]
 
 [project.urls]

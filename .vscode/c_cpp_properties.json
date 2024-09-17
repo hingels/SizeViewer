@@ -4,7 +4,8 @@
             "name": "macos-clang-arm64",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/Library/Frameworks/Python.framework/Versions/3.10/include/python3.10/"
+                "/Library/Frameworks/Python.framework/Versions/3.10/include/python3.10/",
+                "/opt/homebrew/Caskroom/miniforge/base/pkgs/numpy-1.26.4-py310hd45542a_0"
             ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "${default}",

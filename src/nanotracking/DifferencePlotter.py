@@ -173,8 +173,13 @@ class NTA():
                 assert np.all(new_bins == bins) == True, 'Unequal sequence of bins between samples detected!'
             bins = new_bins
             sizes = data['PSD_corrected_[counts/mL/nm]']
-            # data_handler.parse_data(bins, sizes, os.path.join(self.output_folder, 'Something.txt', num_data_points))
-            data_handler.parse_data(something = 100)
+            # data_handler.parse_data(bins.to_numpy(dtype = np.double), sizes.to_numpy(dtype = np.double), sample.filename, self.output_folder, num_data_points)
+            # data_handler.parse_data(
+            #     bins = bins.to_numpy(dtype = np.double),
+            #     sizes = sizes.to_numpy(dtype = np.double),
+            #     sample_filename = sample.filename,
+            #     outputs_path = self.output_folder,
+            #     num_data_points = num_data_points)
             width = bins[1] - bins[0]
             fulldata_size_sum = np.sum(full_data['PSD_corrected_[counts/mL/nm]'])
             
@@ -453,6 +458,9 @@ class NTA():
         for i, ax in enumerate(axs):
             sample = samples[i]
             bins, sizes = all_bins[i], all_sizes[i]
+            # bins, sizes = data_handler.read_data(sample_filename = sample.filename, outputs_path = output_folder, num_data_points = num_data_points)
+            # print(len(bins))
+            # print(bins)
             width = bins[1] - bins[0]
             bin_centers = bins + width/2
             # avg_histogram, total_std = avg_histograms[i], total_stds[i]

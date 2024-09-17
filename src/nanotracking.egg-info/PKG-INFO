@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: nanotracking
-Version: 0.0.52
+Version: 0.0.1
 Summary: Provides visualization and analysis features for nanoparticle tracking analysis (NTA) data, particularly from the Horiba ViewSizer 3000.
 Author-email: Henry Ingels <henryingels@gmail.com>
 Project-URL: Homepage, https://github.com/hingels/SizeViewer
