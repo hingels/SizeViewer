@@ -1,7 +1,7 @@
 import unittest
 from src.nanotracking import DifferencePlotter
 
-class Test_DifferencePlotter(unittest.TestCase):
+class Test_Basics(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.nta = DifferencePlotter.NTA(
