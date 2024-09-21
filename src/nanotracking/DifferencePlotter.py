@@ -448,7 +448,8 @@ class NTA():
             all_size_differences = np.load(tmp_filenames['size_differences']+'.npy')
 
         mpl.rcParams["figure.figsize"] = self.figsize
-        fig, axs = plt.subplots(num_of_plots, 1)
+        fig, axs = plt.subplots(num_of_plots, 1, squeeze = False)
+        axs = axs[:,0]  # Flatten axs from a 2D array (of size num_of_plots x 1) to a 1D array
         fig.subplots_adjust(hspace=-0.05*height)
         transFigure = fig.transFigure
         transFigure_inverted = transFigure.inverted()
