@@ -23,7 +23,7 @@ from .sample_class import Sample
 from .settings_classes import Setting, Settings
 from .InfoComparison import compare_info
 from .DrawTable import draw_table
-from nanotracking import data_handler
+# from nanotracking import data_handler
 
 volume = 2.3E-06
 x_lim = 400
