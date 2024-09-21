@@ -69,18 +69,66 @@ class NTA():
             # 'total_stds': os.path.join(output_folder, 'total_stds')
         }
         self.results_for_csv = None
+        self.result_names = {
+            'time': None,
+            'concentration': None
+        }
         self.sums = []
         self.need_recompute = True
         self.need_reprep_tabulation = True
-        # self.need_reconfig_settings = True
         self.configure_settings()
-    def enable_table(self, include_experimental_unit, treatments_and_waits, results_column_names, column_names, column_widths, width, margin_minimum_right, margin_left):
+    def enable_table(self, width, margin_minimum_right, margin_left):
         table_settings = locals(); table_settings.pop('self')
+        table_settings.update({
+            'include_experimental_unit': False,
+            'treatments_and_waits': None,
+            'column_names': [],
+            'column_widths': []
+        })
         self.table_settings = table_settings
         self.need_recompute = True
         self.need_reprep_tabulation = True
     def disable_table(self):
         self.table_settings = None
+    def table_add_column(self, name, width):
+        table_settings = self.table_settings
+        table_settings['column_names'].append(name)
+        table_settings['column_widths'].append(width)
+    def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3):
+        '''
+        Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
+        '''
+        self.table_add_column(column_name, width)
+    def table_add_treatments_and_waits(self, treatments_column_name, treatments_width, waits_column_name, waits_width):
+        '''
+        For each treatment & wait-time listed in samples' info.md files, adds to the table
+        (1) a column for the treatment's name, and (2) a column for the time waited after applying the treatment.
+        '''
+        table_settings = self.table_settings
+        start_index = len(table_settings['column_names'])
+        assert table_settings['treatments_and_waits'] is None, "Treatments and waits have already been added to the table."
+        table_settings['treatments_and_waits'] = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
+    def results_enable_time(self, name):
+        '''
+        Calculate the time differences between measurements, and include these in CSV outputs.
+        Use table_add_time() to include in the table.
+        '''
+        self.result_names['time'] = name
+    def results_enable_concentration(self, name):
+        '''
+        Calculate the concentration for each measurement, and include these in CSV outputs.
+        Use table_add_concentration() to include in the table.
+        '''
+        self.result_names['concentration'] = name
+    def table_add_time(self, width):
+        name = self.result_names['time']
+        assert name is not None, "Must run NTA.results_enable_time() first."
+        self.table_add_column(name, width)
+    def table_add_concentration(self, width):
+        name = self.result_names['concentration']
+        assert name is not None, "Must run NTA.results_enable_concentration() first."
+        self.table_add_column(name, width)
+            
     def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
         peak_settings = locals(); peak_settings.pop('self')
         x = np.linspace(0, kernel_size, kernel_size)
@@ -258,10 +306,15 @@ class NTA():
         if table_enabled:
             column_widths = table_settings['column_widths']
             column_names = table_settings['column_names']
-            include_treatments = ('_treatments_waits' in column_names)
             include_experimental_unit = table_settings['include_experimental_unit']
             treatments_and_waits = table_settings['treatments_and_waits']
-            results_column_names = table_settings['results_column_names']
+            include_treatments = (treatments_and_waits is not None)
+            if include_treatments:
+                treatments_waits_columnIndex = treatments_and_waits[0]
+            else:
+                treatments_waits_columnIndex = -1
+        result_names = self.result_names
+        time_enabled, concentration_enabled = (result_names['time'] is not None), (result_names['concentration'] is not None)
         previous_setting = settings.by_tag('previous')
         
         results_for_csv = Setting('_results')
@@ -303,12 +356,11 @@ class NTA():
                 for i, name in enumerate(column_names):
                     if '{top_nm}' in name:
                         column_names[i] = name.format(top_nm = top_nm)
-                    elif name == '_treatments_waits':
-                        column_names.pop(i)
+                    elif i == treatments_waits_columnIndex:
                         num_of_treatments = column_quantities['treatment']
                         num_of_waits = column_quantities['wait']
-                        treatment_column_name, treatment_column_width = treatments_and_waits[0]
-                        wait_column_name, wait_column_width = treatments_and_waits[1]
+                        treatment_column_name, treatment_column_width = treatments_and_waits[1]
+                        wait_column_name, wait_column_width = treatments_and_waits[2]
                         index = 0
                         for j in range(max(num_of_treatments, num_of_waits)):
                             if j < num_of_treatments:
@@ -319,9 +371,6 @@ class NTA():
                                 column_names.insert(i + index, wait_column_name.format(wait_number = j + 1))
                                 column_widths.insert(i + index, wait_column_width)
                                 index += 1
-                for i, name in enumerate(results_column_names):     # This is redundant; should find a better way.
-                    if '{top_nm}' in name:
-                        results_column_names[i] = name.format(top_nm = top_nm)
             
             results_for_csv.add_subsetting(previous_setting, 'previous')
             results_for_csv.add_subsetting(Setting("Time since previous (s)"), 'time_since_previous')
@@ -380,43 +429,45 @@ class NTA():
                 ID = settings.by_tag('ID').get_value(sample)
                 row.append('\n'.join((ID[0:4], ID[4:8], ID[8:12])))
                 
-                text = []
-                time = settings.by_tag('time').get_value(sample)
-                time_since_above = None
-                if time_of_above is not None:
-                    time_since_above = int((time - time_of_above).total_seconds())
-                    text.append(f"{time_since_above} since above")
-                time_of_above = time
+                if time_enabled:
+                    text = []
+                    time = settings.by_tag('time').get_value(sample)
+                    time_since_above = None
+                    if time_of_above is not None:
+                        time_since_above = int((time - time_of_above).total_seconds())
+                        text.append(f"{time_since_above} since above")
+                    time_of_above = time
 
-                previous = settings.by_tag('previous').get_value(sample)
-                results_for_csv.previous.set_value(sample, previous)
-                ID_of_previous = None
-                time_since_previous = None
-                if previous is not None:
-                    if previous not in unordered_samples:
-                        time_since_previous = '?'
-                    else:
-                        previous_sample = unordered_samples[previous]
-                        ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
-                        time_of_previous = settings.by_tag('time').get_value(previous_sample)
-                        time_since_previous = int((time - time_of_previous).total_seconds())
-                    text.append(f"{time_since_previous} since previous")
-                results_for_csv.time_since_previous.set_value(sample, time_since_previous)
+                    previous = settings.by_tag('previous').get_value(sample)
+                    results_for_csv.previous.set_value(sample, previous)
+                    ID_of_previous = None
+                    time_since_previous = None
+                    if previous is not None:
+                        if previous not in unordered_samples:
+                            time_since_previous = '?'
+                        else:
+                            previous_sample = unordered_samples[previous]
+                            ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
+                            time_of_previous = settings.by_tag('time').get_value(previous_sample)
+                            time_since_previous = int((time - time_of_previous).total_seconds())
+                        text.append(f"{time_since_previous} since previous")
+                    results_for_csv.time_since_previous.set_value(sample, time_since_previous)
 
-                if ID_of_previous is not None:
-                    ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
-                row.append(ID_of_previous)
-                row.append('\n'.join(text))
-                text.clear()
+                    if ID_of_previous is not None:
+                        ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
+                    row.append(ID_of_previous)
+                    row.append('\n'.join(text))
+                    text.clear()
                 
-                data_sums = sums[i]
-                text.append(f"Total: {data_sums[1][1]:.2E}")
-                results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
-                text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
-                results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
-                row.append('\n'.join(text))
-                row.append("")
-                yield row
+                if concentration_enabled:
+                    data_sums = sums[i]
+                    text.append(f"Total: {data_sums[1][1]:.2E}")
+                    results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
+                    text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
+                    results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
+                    row.append('\n'.join(text))
+                    row.append("")
+                    yield row
         self.rows, self.results_for_csv = tuple(generate_rows()), results_for_csv
         self.need_reprep_tabulation = False
     def compare(self):
