@@ -32,12 +32,14 @@ class Test_Table(unittest.TestCase):
         num_column_names = len(table_settings['column_names'])
         assert len(table_settings['column_widths']) == num_column_names, "Unequal numbers of column widths and names."
         return num_column_names
+    
     def test_number_of_columns(self):
         nta = self.nta
         nta.enable_table(**self.table_settings)
         self.add_columns()
         self.get_num_columns()
-    def check_table_persistence(self):
+    
+    def setup_test_persistence(self):
         nta = self.nta
         nta.enable_table(**self.table_settings)
         self.add_columns()
@@ -47,9 +49,15 @@ class Test_Table(unittest.TestCase):
         nta.plot(name = "Initial plot")
         self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.plot().")
         return num_columns
+    def finish_test_persistence(self, num_columns):
+        nta = self.nta
+        nta.compute()
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.compute().")
+        nta.plot(name = "Final plot")
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.plot().")
     def test_persistence_with_peakfinding(self):
         nta = self.nta
-        num_columns = self.check_table_persistence()
+        num_columns = self.setup_test_persistence()
         nta.enable_peak_detection(
             kernel_size = 30,
             kernel2_size = 20,
@@ -59,10 +67,19 @@ class Test_Table(unittest.TestCase):
             rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}
         )
         self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.enable_peak_detection().")
-        nta.compute()
-        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.compute().")
-        nta.plot(name = "Final plot")
-        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.plot().")
+        self.finish_test_persistence(num_columns)
+    def test_persistence_with_cumulative(self):
+        nta = self.nta
+        num_columns = self.setup_test_persistence()
+        nta.enable_cumulative()
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.enable_cumulative().")
+        self.finish_test_persistence(num_columns)
+    def test_persistence_with_difference(self):
+        nta = self.nta
+        num_columns = self.setup_test_persistence()
+        nta.enable_difference()
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.enable_difference().")
+        self.finish_test_persistence(num_columns)
 
 if __name__ == '__main__':
     unittest.main()
