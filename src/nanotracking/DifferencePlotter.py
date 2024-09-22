@@ -68,8 +68,8 @@ class NTA():
             # 'avg_histograms': os.path.join(output_folder, 'avg_histograms'),
             # 'total_stds': os.path.join(output_folder, 'total_stds')
         }
-        self.setting_columnNames = []
-        self.setting_columnWidths = []
+        # self.setting_columnNames = []
+        # self.setting_columnWidths = []
         self.results_for_csv = None
         self.result_names = {
             'time': None,
@@ -88,25 +88,29 @@ class NTA():
         table_settings.update({
             'include_experimental_unit': False,
             'treatments_and_waits': None,
-            'setting_tags': [],
+            # 'setting_tags': [],
             'column_names': [],
-            'column_widths': []
+            'column_widths': [],
+            'column_names_without_treatmentsOrWaits': [],
+            'column_widths_without_treatmentsOrWaits': []
         })
         self.table_settings = table_settings
         self.need_recompute = True
         self.need_reprep_tabulation = True
     def disable_table(self):
-        self.table_settings = None
-    # def table_add_column(self, setting_tag, name, width):
+        self.table_settings = None    
+    # def table_add_setting(self, setting_tag, name, width):
+    # def table_add_setting(self, name, width):
     def table_add_column(self, name, width):
         table_settings = self.table_settings
-        # table_settings['setting_tags'].append(setting_tag)
-        table_settings['column_names'].append(name)
-        table_settings['column_widths'].append(width)
-    # def table_add_result(self, name, width):
-    #     table_settings = self.table_settings
-    #     table_settings['result_names'].append(name)
-    #     table_settings['result_widths'].append(width)
+        # # table_settings['setting_tags'].append(setting_tag)
+        # table_settings['column_names'].append(name)
+        # table_settings['column_widths'].append(width)
+        # # self.setting_columnNames.append(name)
+        # # self.setting_columnWidths.append(width)
+        table_settings['column_names_without_treatmentsOrWaits'].append(name)
+        table_settings['column_widths_without_treatmentsOrWaits'].append(width)
+    
     def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3):
         '''
         Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
@@ -118,9 +122,18 @@ class NTA():
         (1) a column for the treatment's name, and (2) a column for the time waited after applying the treatment.
         '''
         table_settings = self.table_settings
-        start_index = len(table_settings['column_names'])
+        start_index = len(table_settings['column_names_without_treatmentsOrWaits'])
         assert table_settings['treatments_and_waits'] is None, "Treatments and waits have already been added to the table."
         table_settings['treatments_and_waits'] = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
+        # column_names_without_treatmentsOrWaits = self.column_names_without_treatmentsOrWaits
+        # start_index = len(column_names_without_treatmentsOrWaits)
+        # assert self.treatments_and_waits is None, "Treatments and waits have already been added to the table."
+        # self.treatments_and_waits = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
+    def reset_columns(self):
+        table_settings = self.table_settings
+        table_settings['column_names'] = table_settings['column_names_without_treatmentsOrWaits'].copy()
+        table_settings['column_widths'] = table_settings['column_widths_without_treatmentsOrWaits'].copy()
+
     # def results_enable_time(self, name):
     #     '''
     #     Calculate the time differences between measurements, and include these in CSV outputs.
@@ -323,8 +336,9 @@ class NTA():
         table_settings, settings, num_of_plots, samples, unordered_samples = self.table_settings, self.settings, self.num_of_plots, self.samples, self.unordered_samples
         table_enabled = (table_settings is not None)
         if table_enabled:
-            column_widths = table_settings['column_widths'].copy() # Copying so modifications won't affect the original column_widths and column_names
-            column_names = table_settings['column_names'].copy()
+            self.reset_columns() # If prepare_tabulation() has been run before, remove the columns for treatments and waits.
+            column_widths = table_settings['column_widths']
+            column_names = table_settings['column_names']
             include_experimental_unit = table_settings['include_experimental_unit']
             treatments_and_waits = table_settings['treatments_and_waits']
             include_treatments = (treatments_and_waits is not None)
