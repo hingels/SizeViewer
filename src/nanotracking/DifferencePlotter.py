@@ -12,6 +12,7 @@ import numpy as np
 import scipy
 from scipy.signal import argrelextrema
 from collections import OrderedDict
+import typing
 import matplotlib as mpl
 resolution = 200
 mpl.rcParams['figure.dpi'] = resolution
@@ -75,10 +76,6 @@ class NTA():
             'time': None,
             'concentration': None
         }
-        self.result_widths = {
-            'time': None,
-            'concentration': None
-        }
         self.sums = []
         self.need_recompute = True
         self.need_reprep_tabulation = True
@@ -89,6 +86,7 @@ class NTA():
             'include_experimental_unit': False,
             'treatments_and_waits': None,
             # 'setting_tags': [],
+            'columns_as_Settings_object': Settings(),
             'column_names': [],
             'column_widths': [],
             'column_names_without_treatmentsOrWaits': [],
@@ -99,23 +97,79 @@ class NTA():
         self.need_reprep_tabulation = True
     def disable_table(self):
         self.table_settings = None    
-    # def table_add_setting(self, setting_tag, name, width):
-    # def table_add_setting(self, name, width):
-    def table_add_column(self, name, width):
-        table_settings = self.table_settings
-        # # table_settings['setting_tags'].append(setting_tag)
-        # table_settings['column_names'].append(name)
-        # table_settings['column_widths'].append(width)
-        # # self.setting_columnNames.append(name)
-        # # self.setting_columnWidths.append(width)
-        table_settings['column_names_without_treatmentsOrWaits'].append(name)
-        table_settings['column_widths_without_treatmentsOrWaits'].append(width)
+    # # def table_add_setting(self, setting_tag, name, width):
+    # # def table_add_setting(self, name, width):
+    # def table_add_column(self, name, width):
+    #     table_settings = self.table_settings
+    #     # # table_settings['setting_tags'].append(setting_tag)
+    #     # table_settings['column_names'].append(name)
+    #     # table_settings['column_widths'].append(width)
+    #     # # self.setting_columnNames.append(name)
+    #     # # self.setting_columnWidths.append(width)
+    #     table_settings['column_names_without_treatmentsOrWaits'].append(name)
+    #     table_settings['column_widths_without_treatmentsOrWaits'].append(width)
+    def table_add_setting(self, setting: Setting):
+        tag = setting.tag
+        assert tag not in self.table_settings['columns_as_Settings_object'].tags, f'Setting with tag "{tag}" already added to table.'
+        if setting.column_number is None:
+            setting.column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
+        self.table_settings['columns_as_Settings_object'].add_setting(setting.tag, setting)
+    def table_add_new_setting(self, tag, column_name, column_width, column_number = None):
+        assert tag not in self.settings.tags, f'Setting with tag "{tag}" already created.'
+        if column_number is None:
+            column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
+        setting = Setting(tag, column_name = column_name, column_width = column_width, column_number = column_number)
+        self.settings.add_setting(tag, setting)
+        self.table_add_setting(setting)
+    def table_add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
+        '''
+        Adds multiple Setting objects to the table.
+        Example use case: specify column_number to group all specified settings into one column.
+
+        If column_number is not given, the next available column will be used.
+        Note: the column_number values of the specified Setting objects will be overwritten!
+        
+        If neither format_string nor format_callback are given, then for each cell in the column, the settings' individual format_strings will be used on separate lines.
+        To use format_string, reference settings' values using their tags in curly braces: for example, format_string = "Red has power {RedLaserPower}."
+        To use format_callback, define a function that accepts settings' values as arguments and returns a formatted (value-containing) string.
+
+        If format_callback is given, it will be used instead of format_string.
+        '''
+        if column_number is None:
+            column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
+        settings = [self.settings.by_tag(tag) for tag in tags]
+        if format_string is None:
+            format_string = '\n'.join([setting.format_string for setting in settings])
+        def prepare_setting(setting):
+            setting.column_number = column_number
+            # setting.format_string = format_string
+            # setting.format_callback = format_callback
+            if column_name is not None: setting.column_name = column_name
+            if column_width is not None: setting.column_width = column_width
+        if len(settings) == 1:
+            setting = settings[0]
+            prepare_setting(setting)
+            self.table_add_setting(setting)
+            return
+        group = Setting('COLUMN_' + '_'.join(tags), column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
+        for setting in settings:
+            prepare_setting(setting)
+            group.add_subsetting(setting, setting.tag)
+        self.table_add_setting(group)
+
     
-    def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3):
+    def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
         '''
         Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
         '''
-        self.table_add_column(column_name, width)
+        # self.table_add_column(column_name, width)
+        experimental_unit = self.settings.by_tag('experimental_unit')
+        if column_number is None:
+            column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
+        experimental_unit.column_number = column_number
+        experimental_unit.column_name = column_name
+        experimental_unit.column_width = width
+        self.table_add_setting(experimental_unit)
     def table_add_treatments_and_waits(self, treatments_column_name, treatments_width, waits_column_name, waits_width):
         '''
         For each treatment & wait-time listed in samples' info.md files, adds to the table
@@ -131,8 +185,8 @@ class NTA():
         # self.treatments_and_waits = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
     def reset_columns(self):
         table_settings = self.table_settings
-        table_settings['column_names'] = table_settings['column_names_without_treatmentsOrWaits'].copy()
-        table_settings['column_widths'] = table_settings['column_widths_without_treatmentsOrWaits'].copy()
+        table_settings['column_names'] = list(table_settings['columns_as_Settings_object'].column_names.keys())
+        table_settings['column_widths'] = table_settings['columns_as_Settings_object'].column_widths.copy()
 
     # def results_enable_time(self, name):
     #     '''
@@ -155,10 +209,12 @@ class NTA():
     #     assert name is not None, "Must run NTA.results_enable_concentration() first."
     #     self.table_add_result(name, width)
     def table_add_time(self, name, width):
-        self.table_add_column(name, width)
+        # self.table_add_column(name, width)
+        self.table_add_settings_by_tag('time', column_name = name, column_width = width)
         self.result_names['time'] = name
     def table_add_concentration(self, name, width):
-        self.table_add_column(name, width)
+        # self.table_add_column(name, width)
+        self.table_add_new_setting('concentration', name, width)
         self.result_names['concentration'] = name
             
     def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
@@ -189,25 +245,25 @@ class NTA():
     def configure_settings(self):
         previous_setting = Setting('previous', name = 'Previous')
         md_settings = [
-            Setting('experimental_unit', name = 'Experimental unit'),#, column = 0),
+            Setting('experimental_unit', name = 'Experimental unit'),
             Setting('treatment', name = 'Treatment', units = 'µM'),
             Setting('wait', name = 'Wait', units = 'h'),
-            Setting('filter', name = 'Filter cut-on', units = 'nm', column = 1),
+            Setting('filter', name = 'Filter cut-on', units = 'nm'),
             previous_setting ]
         red_enabled = Setting('RedLaserEnabled', name = 'Red enabled', datatype = bool)
         green_enabled = Setting('GreenLaserEnabled', name = 'Green enabled', datatype = bool)
         blue_enabled = Setting('BlueLaserEnabled', name = 'Blue enabled', datatype = bool)
         detection_threshold_setting = Setting('DetectionThresholdType', name = 'Detection mode', dependencies_require = 'Manual')
         xml_settings = [
-            Setting('RedLaserPower', short_name = '635nm', name = '635nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = red_enabled),
+            Setting('RedLaserPower', short_name = '635nm', name = '635nm power', units = 'mW', datatype = int, show_name = True, depends_on = red_enabled),
             red_enabled,
-            Setting('GreenLaserPower', short_name = '520nm', name = '520nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = green_enabled),
+            Setting('GreenLaserPower', short_name = '520nm', name = '520nm power', units = 'mW', datatype = int, show_name = True, depends_on = green_enabled),
             green_enabled,
-            Setting('BlueLaserPower', short_name = '445nm', name = '445nm power', units = 'mW', column = 2, datatype = int, show_name = True, depends_on = blue_enabled),
+            Setting('BlueLaserPower', short_name = '445nm', name = '445nm power', units = 'mW', datatype = int, show_name = True, depends_on = blue_enabled),
             blue_enabled,
             Setting('Exposure', units = 'ms', datatype = int),
             Setting('Gain', units = 'dB', datatype = int),
-            Setting('MeasurementStartDateTime'),#, column = 5),
+            Setting('MeasurementStartDateTime'),
             Setting('FrameRate', name = 'Framerate', units = 'fps', datatype = int),
             Setting('FramesPerVideo', name = 'Frames per video', units = 'frames', datatype = int),
             Setting('NumOfVideos', name = 'Number of videos', datatype = int),
@@ -438,39 +494,55 @@ class NTA():
                             if hasattr(experimental_unit, 'age'):
                                 age = experimental_unit.age.get_value(sample)
                                 text += f"\n{age:.1f} d old" if age is not None else ''
-                        row.append(text)        
-                columns = list(settings.columns.items())
-                columns.sort()
-                for j, column in columns:
-                    content = '\n'.join(
-                        setting.show_name*f"{setting.short_name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
-                        for setting in column if setting.get_value(sample) is not None )
-                    row.append(content)
-                exposure = settings.by_tag('Exposure').get_value(sample)
-                gain = settings.by_tag('Gain').get_value(sample)
-                row.append(f"{exposure} ms,\n{gain} dB")
-                detection_mode = settings.by_tag('DetectionThresholdType').get_value(sample)
-                detection_threshold = settings.by_tag('DetectionThreshold').get_value(sample)
-                if detection_threshold is None:
-                    row.append(detection_mode)
-                else:
-                    row.append(f"{detection_mode}\n{detection_threshold}")
-                framerate = settings.by_tag('FrameRate').get_value(sample)
-                frames_per_video = settings.by_tag('FramesPerVideo').get_value(sample)
-                video_duration = frames_per_video / framerate
-                if video_duration.is_integer():
-                    video_duration = int(video_duration)        
-                num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
-                row.append(f"{video_duration}x{num_of_videos}")
-                stir_time = settings.by_tag('StirredTime').get_value(sample)
-                stir_rpm = settings.by_tag('StirrerSpeed').get_value(sample)
-                row.append(f"{stir_time}x{stir_rpm}")
-                ID = settings.by_tag('ID').get_value(sample)
-                row.append('\n'.join((ID[0:4], ID[4:8], ID[8:12])))
+                        row.append(text)
+                    # columns = list(settings.column_numbers.items())
+                    columns = list(table_settings['columns_as_Settings_object'].column_numbers.items())
+                    columns.sort()
+                    for j, column in columns:
+                        # content = '\n'.join(
+                        #     setting.show_name*f"{setting.short_name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
+                        #     for setting in column if setting.get_value(sample) is not None )
+                        # row.append(content)
+                        assert len(column) == 1, "There can be only one Setting object per column."
+                        if column[0].tag.startswith('COLUMN'):
+                            group = column[0]
+                            grouped_settings = group.subsettings.values()
+                            if group.format_callback is not None:
+                                row.append(group.format_callback(*(setting.get_value(sample) for setting in grouped_settings)))
+                                continue
+                            # print(group.subsettings)
+                            # print(group.tag)
+                            row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
+                        else:
+                            setting = column[0]
+                            row.append(setting.format_string.format(**{setting.tag: setting.get_value(sample)}))
+                
+                # exposure = settings.by_tag('Exposure').get_value(sample)
+                # gain = settings.by_tag('Gain').get_value(sample)
+                # row.append(f"{exposure} ms,\n{gain} dB")
+                # detection_mode = settings.by_tag('DetectionThresholdType').get_value(sample)
+                # detection_threshold = settings.by_tag('DetectionThreshold').get_value(sample)
+                # if detection_threshold is None:
+                #     row.append(detection_mode)
+                # else:
+                #     row.append(f"{detection_mode}\n{detection_threshold}")
+                # framerate = settings.by_tag('FrameRate').get_value(sample)
+                # frames_per_video = settings.by_tag('FramesPerVideo').get_value(sample)
+                # video_duration = frames_per_video / framerate
+                # if video_duration.is_integer():
+                #     video_duration = int(video_duration)        
+                # num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
+                # row.append(f"{video_duration}x{num_of_videos}")
+                # stir_time = settings.by_tag('StirredTime').get_value(sample)
+                # stir_rpm = settings.by_tag('StirrerSpeed').get_value(sample)
+                # row.append(f"{stir_time}x{stir_rpm}")
+                # ID = settings.by_tag('ID').get_value(sample)
+                # row.append('\n'.join((ID[0:4], ID[4:8], ID[8:12])))
                 
                 previous = settings.by_tag('previous').get_value(sample)
                 results_for_csv.previous.set_value(sample, previous)
                 ID_of_previous = None
+                time = settings.by_tag('time').get_value(sample)
                 time_since_previous = None
                 if previous is not None:
                     if previous not in unordered_samples:
@@ -481,31 +553,32 @@ class NTA():
                         time_of_previous = settings.by_tag('time').get_value(previous_sample)
                         time_since_previous = int((time - time_of_previous).total_seconds())
                 results_for_csv.time_since_previous.set_value(sample, time_since_previous)
-                if time_enabled:
-                    text = []
-                    time = settings.by_tag('time').get_value(sample)
-                    time_since_above = None
-                    if time_of_above is not None:
-                        time_since_above = int((time - time_of_above).total_seconds())
-                        text.append(f"{time_since_above} since above")
-                    time_of_above = time
+                # # if ID_of_previous is not None:
+                # #     ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
+                # # row.append(ID_of_previous)
+                # if time_enabled:
+                #     text = []
+                #     time = settings.by_tag('time').get_value(sample)
+                #     time_since_above = None
+                #     if time_of_above is not None:
+                #         time_since_above = int((time - time_of_above).total_seconds())
+                #         text.append(f"{time_since_above} since above")
+                #     time_of_above = time
 
-                    if previous is not None:
-                        text.append(f"{time_since_previous} since previous")
+                #     if previous is not None:
+                #         text.append(f"{time_since_previous} since previous")
 
-                    if ID_of_previous is not None:
-                        ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
-                    row.append(ID_of_previous)
-                    row.append('\n'.join(text))
-                    text.clear()
+                #     # column_names.append(result_names['time'])
+                #     row.append('\n'.join(text))
+                #     text.clear()
                 
                 data_sums = sums[i]
                 results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
                 results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
-                if concentration_enabled:
-                    text.append(f"Total: {data_sums[1][1]:.2E}")
-                    text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
-                    row.append('\n'.join(text))
+                # if concentration_enabled:
+                #     text.append(f"Total: {data_sums[1][1]:.2E}")
+                #     text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
+                #     row.append('\n'.join(text))
                 row.append("")
                 yield row
         self.rows, self.results_for_csv = tuple(generate_rows()), results_for_csv

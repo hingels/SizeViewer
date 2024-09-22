@@ -10,29 +10,36 @@ from .sample_class import Sample
 import typing
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
+from collections import OrderedDict
 
 class Setting():
-    def __init__(self, tag, short_name = None, name = None, units = '', column = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
+    def __init__(self, tag, short_name = None, format_string = None, format_callback = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
         self.tag = tag
         if name is None: name = tag
         self.name = name
         if short_name is None: short_name = name
         self.short_name = short_name
+        self.show_unit = show_unit
+        self.show_name = show_name
+        if format_string is None:
+            format_string = show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
+        self.format_string = format_string
+        self.format_callback = format_callback
         self.units = units
-        self.column = column
+        self.column_number = column_number
+        self.column_name = column_name
+        self.column_width = column_width
         self.sample_values = dict()
         if sample_values is not None:
             for sample, value in sample_values.items():
                 self.set_value(sample, value)
 
-        self.subsettings = dict()
-        self.numbered_subsettings = dict()
+        self.subsettings = OrderedDict()
+        self.numbered_subsettings = OrderedDict()
         if subsettings is not None:
             for subtag, subsetting in subsettings.items():
                 self.add_subsetting(subtag, subsetting)
         
-        self.show_unit = show_unit
-        self.show_name = show_name
         self.datatype = datatype
         self.depends_on = depends_on
         self.dependencies_require = dependencies_require
@@ -70,9 +77,11 @@ class Setting():
 class Settings():
     def __init__(self, settings_dict = None):
         if settings_dict is None:
-            settings_dict = dict()
-        self.tags = dict()
-        self.columns = dict()
+            settings_dict = OrderedDict()
+        self.tags = OrderedDict()
+        self.column_numbers = OrderedDict()
+        self.column_names = OrderedDict()
+        self.column_widths = []
         for tag, setting in settings_dict.items():
             self.add_setting(tag, setting)
     def by_tag(self, tag):
@@ -84,12 +93,21 @@ class Settings():
         assert tag not in tags
         tags[tag] = setting
         
-        columns = self.columns
-        column = setting.column
-        if column is None: return
-        if column not in columns:
-            columns[column] = []
-        columns[column].append(setting)
+        self.column_widths.append(setting.column_width)
+        
+        column_numbers = self.column_numbers
+        column_number = setting.column_number
+        if column_number is not None:
+            if column_number not in column_numbers:
+                column_numbers[column_number] = []
+            column_numbers[column_number].append(setting)
+        
+        column_names = self.column_names
+        column_name = setting.column_name
+        if column_name is not None:
+            if column_name not in column_names:
+                column_names[column_name] = []
+            column_names[column_name].append(setting)
     def apply_dependencies(self):
         '''
         For any setting that is dependent on another setting, set it to zero (or equivalent) if the dependency has a value of False.
