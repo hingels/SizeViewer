@@ -68,8 +68,14 @@ class NTA():
             # 'avg_histograms': os.path.join(output_folder, 'avg_histograms'),
             # 'total_stds': os.path.join(output_folder, 'total_stds')
         }
+        self.setting_columnNames = []
+        self.setting_columnWidths = []
         self.results_for_csv = None
         self.result_names = {
+            'time': None,
+            'concentration': None
+        }
+        self.result_widths = {
             'time': None,
             'concentration': None
         }
@@ -82,6 +88,7 @@ class NTA():
         table_settings.update({
             'include_experimental_unit': False,
             'treatments_and_waits': None,
+            'setting_tags': [],
             'column_names': [],
             'column_widths': []
         })
@@ -90,10 +97,16 @@ class NTA():
         self.need_reprep_tabulation = True
     def disable_table(self):
         self.table_settings = None
+    # def table_add_column(self, setting_tag, name, width):
     def table_add_column(self, name, width):
         table_settings = self.table_settings
+        # table_settings['setting_tags'].append(setting_tag)
         table_settings['column_names'].append(name)
         table_settings['column_widths'].append(width)
+    # def table_add_result(self, name, width):
+    #     table_settings = self.table_settings
+    #     table_settings['result_names'].append(name)
+    #     table_settings['result_widths'].append(width)
     def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3):
         '''
         Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
@@ -108,26 +121,32 @@ class NTA():
         start_index = len(table_settings['column_names'])
         assert table_settings['treatments_and_waits'] is None, "Treatments and waits have already been added to the table."
         table_settings['treatments_and_waits'] = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
-    def results_enable_time(self, name):
-        '''
-        Calculate the time differences between measurements, and include these in CSV outputs.
-        Use table_add_time() to include in the table.
-        '''
+    # def results_enable_time(self, name):
+    #     '''
+    #     Calculate the time differences between measurements, and include these in CSV outputs.
+    #     Use table_add_time() to include in the table.
+    #     '''
+    #     self.result_names['time'] = name
+    # def results_enable_concentration(self, name):
+    #     '''
+    #     Calculate the concentration for each measurement, and include these in CSV outputs.
+    #     Use table_add_concentration() to include in the table.
+    #     '''
+    #     self.result_names['concentration'] = name
+    # def table_add_time(self, width):
+    #     name = self.result_names['time']
+    #     assert name is not None, "Must run NTA.results_enable_time() first."
+    #     self.table_add_result(name, width)
+    # def table_add_concentration(self, width):
+    #     name = self.result_names['concentration']
+    #     assert name is not None, "Must run NTA.results_enable_concentration() first."
+    #     self.table_add_result(name, width)
+    def table_add_time(self, name, width):
+        self.table_add_column(name, width)
         self.result_names['time'] = name
-    def results_enable_concentration(self, name):
-        '''
-        Calculate the concentration for each measurement, and include these in CSV outputs.
-        Use table_add_concentration() to include in the table.
-        '''
+    def table_add_concentration(self, name, width):
+        self.table_add_column(name, width)
         self.result_names['concentration'] = name
-    def table_add_time(self, width):
-        name = self.result_names['time']
-        assert name is not None, "Must run NTA.results_enable_time() first."
-        self.table_add_column(name, width)
-    def table_add_concentration(self, width):
-        name = self.result_names['concentration']
-        assert name is not None, "Must run NTA.results_enable_concentration() first."
-        self.table_add_column(name, width)
             
     def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
         peak_settings = locals(); peak_settings.pop('self')
@@ -304,8 +323,8 @@ class NTA():
         table_settings, settings, num_of_plots, samples, unordered_samples = self.table_settings, self.settings, self.num_of_plots, self.samples, self.unordered_samples
         table_enabled = (table_settings is not None)
         if table_enabled:
-            column_widths = table_settings['column_widths']
-            column_names = table_settings['column_names']
+            column_widths = table_settings['column_widths'].copy() # Copying so modifications won't affect the original column_widths and column_names
+            column_names = table_settings['column_names'].copy()
             include_experimental_unit = table_settings['include_experimental_unit']
             treatments_and_waits = table_settings['treatments_and_waits']
             include_treatments = (treatments_and_waits is not None)
@@ -429,6 +448,19 @@ class NTA():
                 ID = settings.by_tag('ID').get_value(sample)
                 row.append('\n'.join((ID[0:4], ID[4:8], ID[8:12])))
                 
+                previous = settings.by_tag('previous').get_value(sample)
+                results_for_csv.previous.set_value(sample, previous)
+                ID_of_previous = None
+                time_since_previous = None
+                if previous is not None:
+                    if previous not in unordered_samples:
+                        time_since_previous = '?'
+                    else:
+                        previous_sample = unordered_samples[previous]
+                        ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
+                        time_of_previous = settings.by_tag('time').get_value(previous_sample)
+                        time_since_previous = int((time - time_of_previous).total_seconds())
+                results_for_csv.time_since_previous.set_value(sample, time_since_previous)
                 if time_enabled:
                     text = []
                     time = settings.by_tag('time').get_value(sample)
@@ -438,20 +470,8 @@ class NTA():
                         text.append(f"{time_since_above} since above")
                     time_of_above = time
 
-                    previous = settings.by_tag('previous').get_value(sample)
-                    results_for_csv.previous.set_value(sample, previous)
-                    ID_of_previous = None
-                    time_since_previous = None
                     if previous is not None:
-                        if previous not in unordered_samples:
-                            time_since_previous = '?'
-                        else:
-                            previous_sample = unordered_samples[previous]
-                            ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
-                            time_of_previous = settings.by_tag('time').get_value(previous_sample)
-                            time_since_previous = int((time - time_of_previous).total_seconds())
                         text.append(f"{time_since_previous} since previous")
-                    results_for_csv.time_since_previous.set_value(sample, time_since_previous)
 
                     if ID_of_previous is not None:
                         ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
@@ -459,15 +479,15 @@ class NTA():
                     row.append('\n'.join(text))
                     text.clear()
                 
+                data_sums = sums[i]
+                results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
+                results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
                 if concentration_enabled:
-                    data_sums = sums[i]
                     text.append(f"Total: {data_sums[1][1]:.2E}")
-                    results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
                     text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
-                    results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
                     row.append('\n'.join(text))
-                    row.append("")
-                    yield row
+                row.append("")
+                yield row
         self.rows, self.results_for_csv = tuple(generate_rows()), results_for_csv
         self.need_reprep_tabulation = False
     def compare(self):
@@ -551,12 +571,12 @@ class NTA():
                 plt.xlabel("Diameter (nm)")
                 plt.ticklabel_format(style = 'sci', axis = 'y', scilimits = (0, 0))
                 ax.spines.left.set_visible(True)
-                plt.axhline(0, color = 'black')
-                break
+                # plt.axhline(0, color = 'black')
+                # break
             else:
                 ax.spines['bottom'].set_position(('data', 0))
-            plt.yticks([])
-            plt.xticks([])
+                plt.yticks([])
+                plt.xticks([])
 
             origin_transDisplay = ax.transData.transform([0, 0])
             origins.append(transFigure_inverted.transform(origin_transDisplay))
