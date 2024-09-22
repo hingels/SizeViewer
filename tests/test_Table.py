@@ -2,11 +2,13 @@ import unittest
 from src.nanotracking import DifferencePlotter
 
 class Test_Table(unittest.TestCase):
+    filenames = ["1", "1.2", "1.3"]
+    specifiers = "All measurements"
     def setUp(self):
-        filenames = ["1"]
+        filenames = self.filenames
         nta = DifferencePlotter.NTA(
             datafolder = "tests/Test data",
-            output_folder = f"tests/Test output/{self.id()}",
+            output_folder = f"tests/Test output/{self.specifiers}/{self.id()}",
             filenames = filenames
         )
         nta.compute()
@@ -86,6 +88,13 @@ class Test_Table(unittest.TestCase):
         nta.enable_difference()
         self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.enable_difference().")
         self.finish_test_persistence(num_columns)
+
+class Test_Table_OneMeasurement(Test_Table):
+    filenames = ["1"]
+    specifiers = "One measurement"
+class Test_Table_TwoMeasurements(Test_Table):
+    filenames = ["1", "1.2"]
+    specifiers = "Two measurements"
 
 if __name__ == '__main__':
     unittest.main()
