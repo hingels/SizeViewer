@@ -5,7 +5,7 @@ class Test_Table(unittest.TestCase):
     def setUp(self):
         nta = DifferencePlotter.NTA(
             datafolder = "tests/Test data",
-            output_folder = "tests/Test output",
+            output_folder = f"tests/Test output/{self.id()}",
             filenames = ["1"]
         )
         nta.compute()
@@ -37,6 +37,32 @@ class Test_Table(unittest.TestCase):
         nta.enable_table(**self.table_settings)
         self.add_columns()
         self.get_num_columns()
+    def check_table_persistence(self):
+        nta = self.nta
+        nta.enable_table(**self.table_settings)
+        self.add_columns()
+        num_columns = self.get_num_columns()
+        nta.compute()
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.compute().")
+        nta.plot(name = "Initial plot")
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.plot().")
+        return num_columns
+    def test_persistence_with_peakfinding(self):
+        nta = self.nta
+        num_columns = self.check_table_persistence()
+        nta.enable_peak_detection(
+            kernel_size = 30,
+            kernel2_size = 20,
+            kernel_std_in_bins = 4,
+            second_derivative_threshold = -30,
+            maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'},
+            rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}
+        )
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.enable_peak_detection().")
+        nta.compute()
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.compute().")
+        nta.plot(name = "Final plot")
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.plot().")
 
 if __name__ == '__main__':
     unittest.main()

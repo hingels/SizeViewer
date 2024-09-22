@@ -6,7 +6,7 @@ class Test_Basics(unittest.TestCase):
     def setUpClass(cls):
         cls.nta = DifferencePlotter.NTA(
             datafolder = "tests/Test data",
-            output_folder = "tests/Test output",
+            output_folder = "tests/Test output/Basics",
             filenames = ["1"]
         )
     def test_compute(self):
