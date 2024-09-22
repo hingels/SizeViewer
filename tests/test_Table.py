@@ -3,7 +3,7 @@ from src.nanotracking import DifferencePlotter
 
 class Test_Table(unittest.TestCase):
     def setUp(self):
-        filenames = ["1", "1.2", "1.3"]
+        filenames = ["1"]
         nta = DifferencePlotter.NTA(
             datafolder = "tests/Test data",
             output_folder = f"tests/Test output/{self.id()}",

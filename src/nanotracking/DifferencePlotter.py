@@ -220,6 +220,12 @@ class NTA():
         self.settings = settings
         # self.need_reconfig_settings = False
     def compute(self, prep_tabulation = True):
+        def vstack(arrays):
+            if len(arrays) == 0:
+                try: return arrays[0]
+                except: return arrays # In case "arrays" is an empty list.
+            return np.vstack(arrays)
+        
         peak_settings = self.peak_settings
         peaks_enabled = (peak_settings is not None)
         if peaks_enabled:
@@ -311,21 +317,21 @@ class NTA():
             previous_sizes = sizes
         
         tmp_filenames = self.tmp_filenames
-        np.save(tmp_filenames['bins'], np.vstack(all_bins))
-        np.save(tmp_filenames['sizes'], np.vstack(all_sizes))
+        np.save(tmp_filenames['bins'], vstack(all_bins))
+        np.save(tmp_filenames['sizes'], vstack(all_sizes))
         np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
-        # np.save(tmp_filenames['total_stds'], np.vstack(total_stds))
-        # np.save(tmp_filenames['avg_histograms'], np.vstack(avg_histograms))
+        # np.save(tmp_filenames['total_stds'], vstack(total_stds))
+        # np.save(tmp_filenames['avg_histograms'], vstack(avg_histograms))
         if peaks_enabled:
-            np.save(tmp_filenames['filtered_sizes'], np.vstack(all_filtered))
+            np.save(tmp_filenames['filtered_sizes'], vstack(all_filtered))
             self.maxima = all_maxima
             self.rejected_maxima = all_rejected
-            np.save(tmp_filenames['top_nm'], np.vstack(all_top_nm))
+            np.save(tmp_filenames['top_nm'], vstack(all_top_nm))
         if cumulative_enabled:
-            np.save(tmp_filenames['cumulative_sums'], np.vstack(cumulative_sums))
+            np.save(tmp_filenames['cumulative_sums'], vstack(cumulative_sums))
             np.save(tmp_filenames['cumsum_maxima'], cumsum_maxima)
         if difference_enabled:
-            np.save(tmp_filenames['size_differences'], np.vstack(all_size_differences))
+            np.save(tmp_filenames['size_differences'], vstack(all_size_differences))
         self.overall_min, self.overall_max = overall_min, overall_max
         self.need_recompute = False
         if prep_tabulation:
@@ -648,10 +654,14 @@ class NTA():
         plt.text(0, text_y, " ", fontsize=12, transform = transFigure, verticalalignment = 'center')
 
         if table_enabled:
-            axis_positions = [origin[1] for origin in origins]
-            cell_height = axis_positions[0] - axis_positions[1]
-            table_top = axis_positions[0] + 0.5*cell_height
-            table_bottom = axis_positions[-1] - 0.5*cell_height
+            if len(origins) > 1:
+                axis_positions = [origin[1] for origin in origins]
+                cell_height = axis_positions[0] - axis_positions[1]
+                table_top = axis_positions[0] + 0.5*cell_height
+                table_bottom = axis_positions[-1] - 0.5*cell_height
+            else:
+                cell_height = table_top = 1
+                table_bottom = 0
             edges = {'right': right_edge_figure, 'bottom': table_bottom, 'top': table_top}
             draw_table(fig, ax, self.rows, edges, table_settings, grid_color)
 
