@@ -474,7 +474,7 @@ class NTA():
         assert self.need_recompute == False, "Must run NTA.compute() first."
         assert self.need_reprep_tabulation == False, "Must run NTA.prepare_tabulation() first."
         compare_info(self.settings, self.samples, self.results_for_csv, self.output_folder)
-    def plot(self, grid_color = '0.8'):
+    def plot(self, grid_color = '0.8', name = 'Ridgeline plot'):
         assert self.need_recompute == False, "Must run NTA.compute() first."
         num_of_plots, samples, colors, table_settings, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table_settings, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
         peaks_enabled = (peak_settings is not None)
@@ -621,4 +621,4 @@ class NTA():
             edges = {'right': right_edge_figure, 'bottom': table_bottom, 'top': table_top}
             draw_table(fig, ax, self.rows, edges, table_settings, grid_color)
 
-        fig.savefig(f"{output_folder}/Ridgeline plot.png", dpi = 300, bbox_inches='tight')
+        fig.savefig(f"{output_folder}/{name}.png", dpi = 300, bbox_inches='tight')
