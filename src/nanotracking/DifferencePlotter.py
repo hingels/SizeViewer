@@ -12,6 +12,7 @@ import numpy as np
 import scipy
 from scipy.signal import argrelextrema
 from collections import OrderedDict
+from copy import deepcopy
 import typing
 import matplotlib as mpl
 resolution = 200
@@ -182,17 +183,13 @@ class NTA():
         # for setting in results_group.subsettings.values():
         #     self.table_add_setting(setting)
 
-        results_group.column_number = column_number
-        results_group.column_name = column_name
-        results_group.column_width = column_width
-        results_group.format_string = format_string
-        results_group.format_callback = format_callback
         if format_callback is None:
             group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
         else:
             group_suffix = format_callback.__name__
-        results_group.tag += group_suffix
-        self.table_add_setting(results_group)
+        new_column = deepcopy(results_group)
+        new_column.set_attributes(tag = results_group.tag + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
+        self.table_add_setting(new_column)
     
     def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
         '''
