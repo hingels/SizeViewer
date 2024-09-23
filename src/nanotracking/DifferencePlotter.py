@@ -477,10 +477,13 @@ class NTA():
                     top_nm, _ = data_sums[1]
                 assert data_sums[1][0] == top_nm
             if table_enabled:
-                for i, name in enumerate(column_names):
-                    if '{top_nm}' in name:
-                        column_names[i] = name.format(top_nm = top_nm)
-                    elif i == treatments_waits_columnIndex:
+                # for i, name in enumerate(column_names):
+                for i in range(len(column_names) + 1): # +1 accounts for the case where len(column_names) = 1. Still may want to insert treatments_and_waits columns at index 0.
+                    if i < len(column_names):
+                        name = column_names[i]
+                        if '{top_nm}' in name:
+                            column_names[i] = name.format(top_nm = top_nm)
+                    if i == treatments_waits_columnIndex:
                         num_of_treatments = column_quantities['treatment']
                         num_of_waits = column_quantities['wait']
                         treatment_column_name, treatment_column_width = treatments_and_waits[1]
