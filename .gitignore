@@ -3,4 +3,7 @@ __pycache__
 *.DS_STORE
 *.dsym
 /.vscode
+/.nanotracking.egg-info
+/build
+/dist
 Test output
