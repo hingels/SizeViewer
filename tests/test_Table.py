@@ -16,7 +16,7 @@ class Test_Table(unittest.TestCase):
         self.assertEqual(nta.num_of_plots, len(filenames), "Number of filenames is not equal to number of plots.")
         self.num_of_plots = nta.num_of_plots
         self.table_options = {
-            'width': 2.2,
+            'width': 2.5,
             'margin_minimum_right': 0.03,
             'margin_left': 0.2
         }
@@ -50,16 +50,65 @@ class Test_Table(unittest.TestCase):
             return '\n'.join((ID[0:4], ID[4:8], ID[8:12]))
         nta.table_add_settings_by_tag('ID', column_name = "ID", column_width = 0.1, format_callback = get_ID_info)
         
+        settings = nta.settings
+        unordered_samples = nta.unordered_samples
         def get_previous_ID_info(previous):
-            previous_sample = nta.unordered_samples[previous]
-            ID_of_previous = nta.settings.by_tag('ID').get_value(previous_sample)
+            if previous is None: return ''
+            previous_sample = unordered_samples[previous]
+            ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
             return '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
         # previous_ID_setting = settings_classes.Setting('previous_ID_setting', column_name = "ID of\nprevious", column_width = 0.13, format_callback = get_previous_ID_info)
         # nta.settings.add_setting(previous_ID_setting.tag, previous_ID_setting)
         nta.table_add_settings_by_tag('previous', column_name = "ID of\nprevious", column_width = 0.13, format_callback = get_previous_ID_info)
 
-        nta.table_add_time("Time (s)", 0.33)
-        nta.table_add_concentration("Concentration\n(counts/mL)", 0.3)
+        times = settings.by_tag('time')
+        sums = nta.sums
+        def callback(sample):
+            sample_index = sample.index
+            data_sums = sums[sample_index]
+            time = times.get_value(sample) # times accessed via closure
+            time_since_previous = None
+            previous = settings.by_tag('previous').get_value(sample)
+            if previous is not None:
+                if previous not in unordered_samples:
+                    time_since_previous = '?'
+                else:
+                    previous_sample = unordered_samples[previous]
+                    time_of_previous = settings.by_tag('time').get_value(previous_sample)
+                    time_since_previous = int((time - time_of_previous).total_seconds())
+            try: above = samples[sample_index - 1]
+            except: above = None
+            time_since_above = None
+            if above is not None:
+                time_of_above = times.get_value(above)
+                time_since_above = int((time - time_of_above).total_seconds())
+            return previous, time_since_previous, time_since_above, f"{data_sums[1][1]:.2E}", f"{data_sums[0][1]:.2E}", data_sums[1][0]
+        results_group = nta.new_results_group('previous', 'time_since_previous', 'time_since_above', 'total_conc', 'total_conc_under_topnm', 'top_nm', callback = callback)
+        
+        samples = nta.samples
+        results = nta.results_for_csv
+        # def get_time_info(time, time_since_previous, time_since_above):
+        def get_time_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
+            text = []
+            if time_since_above is not None:
+                text.append(f"{time_since_above} since above")
+            if time_since_previous is not None:
+                text.append(f"{time_since_previous} since previous")
+            return '\n'.join(text)
+        # nta.table_add_time("Time (s)", 0.33)
+        # nta.table_add_concentration("Concentration\n(counts/mL)", 0.3)
+        # nta.table_add_settings_by_tag('time', 'time_since_previous', 'time_since_above', column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
+        nta.table_add_results(results_group, column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
+
+        def get_conc_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
+            return f"Total: {total_conc}\n<{top_nm}nm: {total_conc_under_topnm}"
+        nta.table_add_results(results_group, column_name = "Concentration\n(counts/mL)", column_width = 0.3, format_callback = get_conc_info)
+
+        def get_sample_name(sample):
+            return sample.name
+        nta.table_add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format_callback = get_sample_name)
+            
+
     def get_num_columns(self):
         table_settings = self.nta.table_settings
         num_column_names = len(table_settings['column_names_without_treatmentsOrWaits'])

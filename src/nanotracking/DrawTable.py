@@ -15,7 +15,7 @@ def draw_table(fig, ax, rows, edges, table_settings, grid_color):
     
     width_sum = sum([col_width for name, col_width in zip(column_names, column_widths) if name != ''])
     margin_right = table_width - width_sum
-    assert margin_right >= margin_minimum_right, f"margin_right = {margin_right} < margin_minimum_right = {margin_minimum_right}."
+    assert margin_right >= margin_minimum_right, f"margin_right = {margin_right} < margin_minimum_right = {margin_minimum_right}. Try increasing the table's \"width\" setting."
     column_widths.append(margin_right)
     column_names.append("")
     # display_coords = final_ax.transData.transform([0, overall_min])

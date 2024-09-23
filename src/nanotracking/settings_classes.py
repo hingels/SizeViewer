@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from collections import OrderedDict
 
 class Setting():
-    def __init__(self, tag, short_name = None, format_string = None, format_callback = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
+    def __init__(self, tag, short_name = None, format_string = None, format_callback = None, value_callback = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
         self.tag = tag
         if name is None: name = tag
         self.name = name
@@ -25,6 +25,7 @@ class Setting():
             format_string = show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
         self.format_string = format_string
         self.format_callback = format_callback
+        self.value_callback = value_callback
         self.units = units
         self.column_number = column_number
         self.column_name = column_name
@@ -66,6 +67,8 @@ class Setting():
         elif datatype is timedelta:
             assert type(value) is timedelta
             converted_value = value
+        elif datatype is Sample:
+            converted_value = value
         else:
             converted_value = datatype(value)
         
@@ -74,6 +77,9 @@ class Setting():
         sample_values = self.sample_values
         if sample not in sample_values: return None
         return sample_values[sample]
+    def set_attributes(self, **attrs):
+        for name, value in attrs.items():
+            self.__setattr__(name, value)
 class Settings():
     def __init__(self, settings_dict = None):
         if settings_dict is None:

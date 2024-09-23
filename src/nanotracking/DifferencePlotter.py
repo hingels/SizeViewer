@@ -46,7 +46,15 @@ class NTA():
                 if sample.filename not in filenames: continue
                 yield sample.filename, sample
         unordered_samples = dict(generate_samples())
-        samples = [unordered_samples[name] for name in filenames]
+        samples = []
+        for i, name in enumerate(filenames):
+            sample = unordered_samples[name]
+            sample.index = i
+            samples.append(sample)
+        samples_setting = Setting('sample', datatype = Sample)
+        for sample in samples:
+            samples_setting.set_value(sample, sample)
+        self.samples_setting = samples_setting
         num_of_plots = len(samples)
         width, height = mpl.rcParamsDefault["figure.figsize"]
         height *= (num_of_plots/3)
@@ -71,7 +79,7 @@ class NTA():
         }
         # self.setting_columnNames = []
         # self.setting_columnWidths = []
-        self.results_for_csv = None
+        self.results_for_csv = Settings()
         self.result_names = {
             'time': None,
             'concentration': None
@@ -110,10 +118,11 @@ class NTA():
     #     table_settings['column_widths_without_treatmentsOrWaits'].append(width)
     def table_add_setting(self, setting: Setting):
         tag = setting.tag
-        assert tag not in self.table_settings['columns_as_Settings_object'].tags, f'Setting with tag "{tag}" already added to table.'
+        settings = self.table_settings['columns_as_Settings_object']
+        assert tag not in settings.tags, f'Setting with tag "{tag}" already added to table.'
         if setting.column_number is None:
-            setting.column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
-        self.table_settings['columns_as_Settings_object'].add_setting(setting.tag, setting)
+            setting.column_number = len(settings.column_widths)
+        settings.add_setting(setting.tag, setting)
     def table_add_new_setting(self, tag, column_name, column_width, column_number = None):
         assert tag not in self.settings.tags, f'Setting with tag "{tag}" already created.'
         if column_number is None:
@@ -121,6 +130,11 @@ class NTA():
         setting = Setting(tag, column_name = column_name, column_width = column_width, column_number = column_number)
         self.settings.add_setting(tag, setting)
         self.table_add_setting(setting)
+    def get_setting_or_result(self, tag):
+        output = self.settings.by_tag(tag)
+        if output is None: output = self.results_for_csv.by_tag(tag)
+        assert output is not None, f'Could not find tag "{tag}" in settings or results_for_csv.'
+        return output
     def table_add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
         '''
         Adds multiple Setting objects to the table.
@@ -137,7 +151,7 @@ class NTA():
         '''
         if column_number is None:
             column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
-        settings = [self.settings.by_tag(tag) for tag in tags]
+        settings = [self.get_setting_or_result(tag) for tag in tags]
         if format_string is None:
             format_string = '\n'.join([setting.format_string for setting in settings])
         def prepare_setting(setting):
@@ -149,14 +163,36 @@ class NTA():
         if len(settings) == 1:
             setting = settings[0]
             prepare_setting(setting)
+            setting.set_attributes(format_string = format_string, format_callback = format_callback)
             self.table_add_setting(setting)
             return
-        group = Setting('COLUMN_' + '_'.join(tags), column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
+        if format_callback is None:
+            group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
+        else:
+            group_suffix = format_callback.__name__
+        group = Setting('COLUMN_' + '_'.join(tags) + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
         for setting in settings:
             prepare_setting(setting)
             group.add_subsetting(setting, setting.tag)
         self.table_add_setting(group)
+    def table_add_results(self, results_group, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
+        # tags = results_group.subsettings.keys()
+        # return self.table_add_settings_by_tag(*tags, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
+        
+        # for setting in results_group.subsettings.values():
+        #     self.table_add_setting(setting)
 
+        results_group.column_number = column_number
+        results_group.column_name = column_name
+        results_group.column_width = column_width
+        results_group.format_string = format_string
+        results_group.format_callback = format_callback
+        if format_callback is None:
+            group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
+        else:
+            group_suffix = format_callback.__name__
+        results_group.tag += group_suffix
+        self.table_add_setting(results_group)
     
     def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
         '''
@@ -188,34 +224,27 @@ class NTA():
         table_settings['column_names'] = list(table_settings['columns_as_Settings_object'].column_names.keys())
         table_settings['column_widths'] = table_settings['columns_as_Settings_object'].column_widths.copy()
 
-    # def results_enable_time(self, name):
-    #     '''
-    #     Calculate the time differences between measurements, and include these in CSV outputs.
-    #     Use table_add_time() to include in the table.
-    #     '''
+    # def table_add_time(self, name, width):
+    #     # self.table_add_column(name, width)
+    #     self.table_add_settings_by_tag('time', column_name = name, column_width = width)
     #     self.result_names['time'] = name
-    # def results_enable_concentration(self, name):
-    #     '''
-    #     Calculate the concentration for each measurement, and include these in CSV outputs.
-    #     Use table_add_concentration() to include in the table.
-    #     '''
+    # def table_add_concentration(self, name, width):
+    #     # self.table_add_column(name, width)
+    #     self.table_add_new_setting('concentration', name, width)
     #     self.result_names['concentration'] = name
-    # def table_add_time(self, width):
-    #     name = self.result_names['time']
-    #     assert name is not None, "Must run NTA.results_enable_time() first."
-    #     self.table_add_result(name, width)
-    # def table_add_concentration(self, width):
-    #     name = self.result_names['concentration']
-    #     assert name is not None, "Must run NTA.results_enable_concentration() first."
-    #     self.table_add_result(name, width)
-    def table_add_time(self, name, width):
-        # self.table_add_column(name, width)
-        self.table_add_settings_by_tag('time', column_name = name, column_width = width)
-        self.result_names['time'] = name
-    def table_add_concentration(self, name, width):
-        # self.table_add_column(name, width)
-        self.table_add_new_setting('concentration', name, width)
-        self.result_names['concentration'] = name
+    
+    def new_results_group(self, *tags, callback = None):
+        assert callback is not None, "Must specify callback."
+        group = Setting('RESULTS_' + '_'.join(tags), value_callback = callback)
+        for tag in tags:
+            group.add_subsetting(Setting(tag), tag)
+        self.results_for_csv.add_setting(group.tag, group)
+        return group
+    # def table_add_results_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
+    #     '''
+    #     Alias for table_add_settings_by_tag with is_result = True.
+    #     '''
+    #     self.table_add_settings_by_tag(*tags, is_result = True, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
             
     def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
         peak_settings = locals(); peak_settings.pop('self')
@@ -271,7 +300,7 @@ class NTA():
             Setting('StirredTime', name = 'Stirred time', units = 's', datatype = int),
             detection_threshold_setting,
             Setting('DetectionThreshold', name = 'Detection threshold', datatype = float, depends_on = detection_threshold_setting) ]
-        settings_list = [*md_settings, *xml_settings]
+        settings_list = [self.samples_setting, *md_settings, *xml_settings]
         settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
         self.settings = settings
         # self.need_reconfig_settings = False
@@ -412,7 +441,7 @@ class NTA():
         time_enabled, concentration_enabled = (result_names['time'] is not None), (result_names['concentration'] is not None)
         previous_setting = settings.by_tag('previous')
         
-        results_for_csv = Setting('_results')
+        results_for_csv = self.results_for_csv
         def generate_rows():
             column_quantities = dict()
             def number_of_subtags(tag):
@@ -467,10 +496,10 @@ class NTA():
                                 column_widths.insert(i + index, wait_column_width)
                                 index += 1
             
-            results_for_csv.add_subsetting(previous_setting, 'previous')
-            results_for_csv.add_subsetting(Setting("Time since previous (s)"), 'time_since_previous')
-            results_for_csv.add_subsetting(Setting(f"Concentration\n<{top_nm}nm\n(counts/mL)"), 'total_conc_under_topnm')
-            results_for_csv.add_subsetting(Setting("Concentration\n(counts/mL)"), 'total_conc')
+            # results_for_csv.add_subsetting(previous_setting, 'previous')
+            # results_for_csv.add_subsetting(Setting("Time since previous (s)"), 'time_since_previous')
+            # results_for_csv.add_subsetting(Setting(f"Concentration\n<{top_nm}nm\n(counts/mL)"), 'total_conc_under_topnm')
+            # results_for_csv.add_subsetting(Setting("Concentration\n(counts/mL)"), 'total_conc')
                 
             time_of_above = None
             for i in range(num_of_plots):
@@ -513,9 +542,25 @@ class NTA():
                             # print(group.subsettings)
                             # print(group.tag)
                             row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
+                        elif column[0].tag.startswith('RESULTS'):
+                            group = column[0]
+                            grouped_settings = group.subsettings.values()
+                            values = group.value_callback(sample)
+                            if group.format_callback is not None:
+                                row.append(group.format_callback(*values))
+                                continue
+                            row.append(group.format_string.format(**{setting.tag: value for setting, value in zip(grouped_settings, values)}))
                         else:
                             setting = column[0]
-                            row.append(setting.format_string.format(**{setting.tag: setting.get_value(sample)}))
+                            if setting.value_callback is None:
+                                value = setting.get_value(sample)
+                            else:
+                                value = setting.value_callback(sample)
+                            if setting.format_callback is None:
+                                row.append(setting.format_string.format(**{setting.tag: value}))
+                            else:
+                                row.append(setting.format_callback(value))
+
                 
                 # exposure = settings.by_tag('Exposure').get_value(sample)
                 # gain = settings.by_tag('Gain').get_value(sample)
@@ -539,49 +584,49 @@ class NTA():
                 # ID = settings.by_tag('ID').get_value(sample)
                 # row.append('\n'.join((ID[0:4], ID[4:8], ID[8:12])))
                 
-                previous = settings.by_tag('previous').get_value(sample)
-                results_for_csv.previous.set_value(sample, previous)
-                ID_of_previous = None
-                time = settings.by_tag('time').get_value(sample)
-                time_since_previous = None
-                if previous is not None:
-                    if previous not in unordered_samples:
-                        time_since_previous = '?'
-                    else:
-                        previous_sample = unordered_samples[previous]
-                        ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
-                        time_of_previous = settings.by_tag('time').get_value(previous_sample)
-                        time_since_previous = int((time - time_of_previous).total_seconds())
-                results_for_csv.time_since_previous.set_value(sample, time_since_previous)
-                # # if ID_of_previous is not None:
-                # #     ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
-                # # row.append(ID_of_previous)
-                # if time_enabled:
-                #     text = []
-                #     time = settings.by_tag('time').get_value(sample)
-                #     time_since_above = None
-                #     if time_of_above is not None:
-                #         time_since_above = int((time - time_of_above).total_seconds())
-                #         text.append(f"{time_since_above} since above")
-                #     time_of_above = time
+                # previous = settings.by_tag('previous').get_value(sample)
+                # results_for_csv.previous.set_value(sample, previous)
+                # ID_of_previous = None
+                # time = settings.by_tag('time').get_value(sample)
+                # time_since_previous = None
+                # if previous is not None:
+                #     if previous not in unordered_samples:
+                #         time_since_previous = '?'
+                #     else:
+                #         previous_sample = unordered_samples[previous]
+                #         ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
+                #         time_of_previous = settings.by_tag('time').get_value(previous_sample)
+                #         time_since_previous = int((time - time_of_previous).total_seconds())
+                # results_for_csv.time_since_previous.set_value(sample, time_since_previous)
+                # # # if ID_of_previous is not None:
+                # # #     ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
+                # # # row.append(ID_of_previous)
+                # # if time_enabled:
+                # #     text = []
+                # #     time = settings.by_tag('time').get_value(sample)
+                # #     time_since_above = None
+                # #     if time_of_above is not None:
+                # #         time_since_above = int((time - time_of_above).total_seconds())
+                # #         text.append(f"{time_since_above} since above")
+                # #     time_of_above = time
 
-                #     if previous is not None:
-                #         text.append(f"{time_since_previous} since previous")
+                # #     if previous is not None:
+                # #         text.append(f"{time_since_previous} since previous")
 
-                #     # column_names.append(result_names['time'])
-                #     row.append('\n'.join(text))
-                #     text.clear()
+                # #     # column_names.append(result_names['time'])
+                # #     row.append('\n'.join(text))
+                # #     text.clear()
                 
-                data_sums = sums[i]
-                results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
-                results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
-                # if concentration_enabled:
-                #     text.append(f"Total: {data_sums[1][1]:.2E}")
-                #     text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
-                #     row.append('\n'.join(text))
+                # data_sums = sums[i]
+                # results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
+                # results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
+                # # if concentration_enabled:
+                # #     text.append(f"Total: {data_sums[1][1]:.2E}")
+                # #     text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
+                # #     row.append('\n'.join(text))
                 row.append("")
                 yield row
-        self.rows, self.results_for_csv = tuple(generate_rows()), results_for_csv
+        self.rows = tuple(generate_rows())
         self.need_reprep_tabulation = False
     def compare(self):
         assert self.need_recompute == False, "Must run NTA.compute() first."
