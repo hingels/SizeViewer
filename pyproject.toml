@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nanotracking"
-version = "0.0.1"
+version = "0.0.5a"
 authors = [
   { name="Henry Ingels", email="henryingels@gmail.com" },
 ]
@@ -20,13 +20,8 @@ dependencies = [
     "numpy",
     "matplotlib",
     "bottle",
-    "os",
-    "shutil",
     "pandas",
-    "xml",
-    "datetime",
-    "scipy",
-    "collections"
+    "scipy"
 ]
 
 [project.urls]
