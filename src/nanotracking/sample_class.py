@@ -11,8 +11,9 @@ import os
 import numpy as np
 
 class Sample():
-    def __init__(self, folder, prefix, suffix, videos_file_prefix = None):
+    def __init__(self, folder, prefix, suffix, videos_file_prefix = None, index = None):
         self.folder = folder
+        self.index = index
         info_path = None
         xml_path = None
         dat_path = None

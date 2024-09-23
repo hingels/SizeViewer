@@ -30,7 +30,7 @@ def compare_info(settings, samples, results_object, output_folder):
                 yield name, subsetting
         yield '', blank
         yield 'RESULTS:', blank
-        for result in results_object.subsettings.values():
+        for result in results_object.tags.values():
             name = result.name.replace('\n', ' ')
             units = setting.units
             if units != '': name += f" ({units})"
