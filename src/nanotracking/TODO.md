@@ -1,8 +1,23 @@
+- Add file name templates to demo
+- For clarity about the chronology of the experiment, replace treatment & wait columns with a single column with entries in this format:
+  > Treatment 1 +
+  > Wait 1 +
+  > Treatment 2 +
+  > Wait 2
+  > etc.
+- Clearly indicate that plots correspond to their adjacent rows in the table
+- Detect "DATA_" prefix on folder and correct folder structure
+- Move all user input and error-checking into setup, letting computation loops run efficiently
 - Testing branch
   - Set up CircleCI
   - Add `nox` to automate `unittest` (or `pytest`) tests (and documentation generation, e.g. by `sphinx`) for different versions of Python, etc.
     - See Chris Wilcox presentation at PyCon 2019 on YouTube
   - Test all permutations of table commands in test_Table.py
+  - Add test to ensure correct formatted text is put in the table
+- Switch from `setuptools` to `meson`
+- Set up benchmarking, e.g. Airspeed Velocity
+- Use more efficient debugging, e.g. `pdb`
+  - Learn concepts and practices of proper debugging
 - Switch from `setuptools` to `meson`
 - Housekeeping branch
   - Update TODO.md
@@ -20,7 +35,7 @@
 - Rename format_callback to format_function? May be more accurate
 - Add assertion that each column_number corresponds to exactly one Setting object (which may have subsettings to include multiple rows of information)
 - Add assertion that Setting tag has no spaces in Setting.__init__()
-- Fix parity of Setting.add_subsetting() relative to Settings.add_setting()
+- Fix parity of Setting.add_subsetting() arguments relative to those of Settings.add_setting()
 - Add setting tags to table_add_column
 - Possibly change columns list into list of Setting objects
 - Rename table_add_column to table_add_setting
