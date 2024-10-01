@@ -18,6 +18,7 @@
 - Set up benchmarking, e.g. Airspeed Velocity
 - Use more efficient debugging, e.g. `pdb`
   - Learn concepts and practices of proper debugging
+- Switch from `setuptools` to `meson`
 - Housekeeping branch
   - Update TODO.md
   - Remove commented-out code
@@ -40,6 +41,7 @@
 - Rename table_add_column to table_add_setting
 - Rename table_settings to distinguish it from Settings
 - Add if statements around results_for_csv.add_subsetting; may not want these enabled
+- Add more efficient debugging/testing
 - Add option to plot .dat files other than those whose names start with "ConstantBinsTable_"
 - When animating particle trajectories, plot ViewSizer's trajectories all in one color, but have the shading darken when paths for each particle cross. Then in another color, add trajectories calculated by TrackPy for validation
 - Add docstrings
