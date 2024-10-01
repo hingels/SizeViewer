@@ -1,3 +1,5 @@
+- Add ability to save user-specified calculations to NumPy files
+- Add auto-refresh option
 - Add file name templates to demo
 - For clarity about the chronology of the experiment, replace treatment & wait columns with a single column with entries in this format:
   > Treatment 1 +

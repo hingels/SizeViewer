@@ -12,6 +12,7 @@ import numpy as np
 import scipy
 from scipy.signal import argrelextrema
 from collections import OrderedDict
+from dataclasses import dataclass
 from copy import deepcopy
 import typing
 import matplotlib as mpl
@@ -36,6 +37,11 @@ suffix = '.dat'
 grid_proportion_of_figure = 0.9
 text_shift = 0.05
                     
+@dataclass
+class NeedRefresh:
+    settings: list
+    tabulation: bool
+
 class NTA():
     def __init__(self, datafolder, output_folder, filenames):
         self.datafolder, self.output_folder, self.filenames = datafolder, output_folder, filenames
@@ -87,7 +93,7 @@ class NTA():
         }
         self.sums = []
         self.need_recompute = True
-        self.need_reprep_tabulation = True
+        self.need_refresh = NeedRefresh(settings = [], tabulation = True)
         self.configure_settings()
     def enable_table(self, width, margin_minimum_right, margin_left):
         table_settings = locals(); table_settings.pop('self')
@@ -103,7 +109,7 @@ class NTA():
         })
         self.table_settings = table_settings
         self.need_recompute = True
-        self.need_reprep_tabulation = True
+        self.need_refresh.tabulation = True
     def disable_table(self):
         self.table_settings = None    
     # # def table_add_setting(self, setting_tag, name, width):
@@ -253,19 +259,19 @@ class NTA():
         peak_settings['maxima_description'] = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of size {kernel2_size} bins."
         self.peak_settings = peak_settings
         self.need_recompute = True
-        self.need_reprep_tabulation = True
+        self.need_refresh.tabulation = True
     def disable_peak_detection(self):
         self.peak_settings = None
     def enable_cumulative(self):
         self.cumulative_enabled = True
         self.need_recompute = True
-        self.need_reprep_tabulation = True
+        self.need_refresh.tabulation = True
     def disable_cumulative(self):
         self.cumulative_enabled = False
     def enable_difference(self):
         self.difference_enabled = True
         self.need_recompute = True
-        self.need_reprep_tabulation = True
+        self.need_refresh.tabulation = True
     def disable_difference(self):
         self.difference_enabled = False
     def configure_settings(self):
@@ -301,6 +307,12 @@ class NTA():
         settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
         self.settings = settings
         # self.need_reconfig_settings = False
+    # def refresh(self):
+    #     """
+    #     Applies any changes made to this NTA object, such as the addition of a table to the plot.
+    #     """
+    #     need_refresh = self.need_refresh
+
     def compute(self, prep_tabulation = True):
         def vstack(arrays):
             if len(arrays) == 0:
@@ -312,7 +324,7 @@ class NTA():
         peaks_enabled = (peak_settings is not None)
         if peaks_enabled:
             lowpass_filter, kernel2_size, second_derivative_threshold = peak_settings['lowpass_filter'], peak_settings['kernel2_size'], peak_settings['second_derivative_threshold']
-            all_filtered, all_maxima, all_rejected, all_top_nm,  = [], [], [], []
+            all_filtered, all_maxima, all_rejected  = [], [], []
         cumulative_enabled = self.cumulative_enabled
         if cumulative_enabled:
             cumulative_sums = []
@@ -384,7 +396,6 @@ class NTA():
                 all_filtered.append(filtered)
                 all_maxima.append(maxima)
                 all_rejected.append(rejected_candidates)
-                all_top_nm.append(top_nm)
             if cumulative_enabled:
                 cumulative_sum = np.cumsum(sizes)*width
                 cumulative_sums.append(cumulative_sum)
@@ -408,7 +419,6 @@ class NTA():
             np.save(tmp_filenames['filtered_sizes'], vstack(all_filtered))
             self.maxima = all_maxima
             self.rejected_maxima = all_rejected
-            np.save(tmp_filenames['top_nm'], vstack(all_top_nm))
         if cumulative_enabled:
             np.save(tmp_filenames['cumulative_sums'], vstack(cumulative_sums))
             np.save(tmp_filenames['cumsum_maxima'], cumsum_maxima)
@@ -420,7 +430,6 @@ class NTA():
             self.prepare_tabulation()
     def prepare_tabulation(self):
         # assert self.need_reconfig_settings == False, "Must run NTA.configure_settings() first."
-        sums = self.sums
         table_settings, settings, num_of_plots, samples, unordered_samples = self.table_settings, self.settings, self.num_of_plots, self.samples, self.unordered_samples
         table_enabled = (table_settings is not None)
         if table_enabled:
@@ -456,7 +465,6 @@ class NTA():
                 if values[0] is None:
                     values[0] = setting.get_value(sample)
                 return values
-            top_nm = None
             for i in range(num_of_plots):
                 sample = samples[i]
                 settings.read_files(sample)
@@ -468,18 +476,9 @@ class NTA():
                             column_quantities[tag] = quantity
                             continue
                         column_quantities[tag] = max(column_quantities[tag], quantity)
-                data_sums = sums[i]
-                assert len(data_sums) == 2
-                if top_nm is None:
-                    top_nm, _ = data_sums[1]
-                assert data_sums[1][0] == top_nm
             if table_enabled:
                 # for i, name in enumerate(column_names):
                 for i in range(len(column_names) + 1): # +1 accounts for the case where len(column_names) = 1. Still may want to insert treatments_and_waits columns at index 0.
-                    if i < len(column_names):
-                        name = column_names[i]
-                        if '{top_nm}' in name:
-                            column_names[i] = name.format(top_nm = top_nm)
                     if i == treatments_waits_columnIndex:
                         num_of_treatments = column_quantities['treatment']
                         num_of_waits = column_quantities['wait']
@@ -627,10 +626,10 @@ class NTA():
                 row.append("")
                 yield row
         self.rows = tuple(generate_rows())
-        self.need_reprep_tabulation = False
+        self.need_refresh.tabulation = False
     def compare(self):
         assert self.need_recompute == False, "Must run NTA.compute() first."
-        assert self.need_reprep_tabulation == False, "Must run NTA.prepare_tabulation() first."
+        assert self.need_refresh.tabulation == False, "Must run NTA.prepare_tabulation() first."
         compare_info(self.settings, self.samples, self.results_for_csv, self.output_folder)
     def plot(self, grid_color = '0.8', name = 'Ridgeline plot'):
         assert self.need_recompute == False, "Must run NTA.compute() first."
@@ -638,7 +637,7 @@ class NTA():
         peaks_enabled = (peak_settings is not None)
         table_enabled = (table_settings is not None)
         if table_enabled:
-            assert self.need_reprep_tabulation == False, "Must run NTA.prepare_tabulation() first."
+            assert self.need_refresh.tabulation == False, "Must run NTA.prepare_tabulation() first."
         cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
         (_, height) = self.figsize
         tmp_filenames = self.tmp_filenames

@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TemperatureLog xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Entries>
+    <Entry>
+      <File>1_20240829_125048_0001.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125218_0002.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125308_0003.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125358_0004.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125448_0005.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125538_0006.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125628_0007.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125718_0008.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125808_0009.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>1_20240829_125858_0010.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+  </Entries>
+</TemperatureLog>

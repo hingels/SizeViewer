@@ -1,0 +1,120 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SampleData xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Version>1.0</Version>
+  <RecordingSettings>
+    <Name>Name redacted</Name>
+    <DataPath>Redacted</DataPath>
+    <MeasurementType>MPTA</MeasurementType>
+    <FrameRate>30</FrameRate>
+    <Exposure>20</Exposure>
+    <Gain>20</Gain>
+    <BlueLaserPower>210</BlueLaserPower>
+    <BlueLaserEnabled>true</BlueLaserEnabled>
+    <GreenLaserPower>30</GreenLaserPower>
+    <GreenLaserEnabled>true</GreenLaserEnabled>
+    <RedLaserPower>20</RedLaserPower>
+    <RedLaserEnabled>true</RedLaserEnabled>
+    <RedLaserDuration>20</RedLaserDuration>
+    <GreenLaserDuration>20</GreenLaserDuration>
+    <BlueLaserDuration>20</BlueLaserDuration>
+    <UseLaserLUT>false</UseLaserLUT>
+    <FramesPerVideo>300</FramesPerVideo>
+    <Focus>13.848</Focus>
+    <StirrerSpeed>1400</StirrerSpeed>
+    <StirredTime>10</StirredTime>
+    <WaitTime>30</WaitTime>
+    <NumOfVideos>10</NumOfVideos>
+    <TemperatureOn>1</TemperatureOn>
+    <TargetTemperature>22</TargetTemperature>
+    <Zoom>1</Zoom>
+    <DispersantID>1</DispersantID>
+    <MaterialID>1</MaterialID>
+    <FilterType>None</FilterType>
+    <FilterWavelength>520</FilterWavelength>
+    <FilterBandwidth>6</FilterBandwidth>
+    <CustomTemperatureFlag>0</CustomTemperatureFlag>
+    <TemperatureProfileID>1</TemperatureProfileID>
+    <LasersOff>false</LasersOff>
+    <Brightness>0</Brightness>
+    <Contrast>1</Contrast>
+    <Gamma>1</Gamma>
+    <RedFactor>1</RedFactor>
+    <GreenFactor>1</GreenFactor>
+    <BlueFactor>1</BlueFactor>
+    <Volume>2.3E-06</Volume>
+  </RecordingSettings>
+  <ProcessingSettings>
+    <ProcessingMode>MPTA</ProcessingMode>
+    <QueueForProcessing>true</QueueForProcessing>
+    <VideoProcessEnabled>true</VideoProcessEnabled>
+    <PrintReport>false</PrintReport>
+    <LoadResults>true</LoadResults>
+    <SavePDFReport>true</SavePDFReport>
+    <FileName />
+    <ProcessDescription />
+    <DetectionThresholdType>Polydisperse</DetectionThresholdType>
+    <DetectionThreshold>0.2</DetectionThreshold>
+    <FeatureSize>40</FeatureSize>
+    <StartingFrame>1</StartingFrame>
+    <FramesForAnalysis>300</FramesForAnalysis>
+    <OverrideParticleClusterAlgorithm>true</OverrideParticleClusterAlgorithm>
+    <DriftCorrection>0</DriftCorrection>
+    <SaveIntermediateImage>false</SaveIntermediateImage>
+    <SaveIntermediateFiles>false</SaveIntermediateFiles>
+    <SaveCommonImages>true</SaveCommonImages>
+  </ProcessingSettings>
+  <DisplayAndPlottingSettings>
+    <ReportLayoutID>C:\HORIBA\ViewSizer3000\Report Layout\test.lay</ReportLayoutID>
+    <XMax>1000</XMax>
+    <XMin>0</XMin>
+    <YMax>1000</YMax>
+    <YMin>0</YMin>
+    <XAuto>false</XAuto>
+    <YAuto>true</YAuto>
+    <AxisType>ISO9276_1</AxisType>
+    <Axis>LinX_LinY</Axis>
+    <BinOption>Width_20nm</BinOption>
+    <DistributionBase>Particle_Concentration</DistributionBase>
+    <VolumeCalibration>Silica</VolumeCalibration>
+    <ChartType>0</ChartType>
+    <ReportImageType>Color</ReportImageType>
+    <IntLimitMax>500</IntLimitMax>
+    <IntLimitMin>0</IntLimitMin>
+  </DisplayAndPlottingSettings>
+  <KineticsDisplayOptions>
+    <XMax>1000</XMax>
+    <XMin>0</XMin>
+    <YMax>1000</YMax>
+    <YMin>0</YMin>
+    <XAuto>false</XAuto>
+    <YAuto>true</YAuto>
+    <PlotType>Intensity15_Vs_Time</PlotType>
+  </KineticsDisplayOptions>
+  <SampleInformation>
+    <Name>1</Name>
+    <DataPath>Redacted</DataPath>
+    <ID>202408291250</ID>
+    <Type>Sample</Type>
+    <Amount>1</Amount>
+    <Dilution>1</Dilution>
+    <Density>2</Density>
+    <Description />
+    <Analyst />
+  </SampleInformation>
+  <MetaData>
+    <MeasurementStartDateTime>2024-08-29 12:50:48</MeasurementStartDateTime>
+    <MeasurementEndDataTime>2024-08-29 12:59:08</MeasurementEndDataTime>
+    <AnalyzerModel>ViewSizer3000</AnalyzerModel>
+    <SerialNumber>085</SerialNumber>
+    <CalibrationConstant>192.02</CalibrationConstant>
+    <RecordingSoftwareVersion>2.12</RecordingSoftwareVersion>
+    <FirmwareVersion>1.3.7</FirmwareVersion>
+    <CameraType>AVT Manta 319C</CameraType>
+    <CustomerName>Horiba</CustomerName>
+    <Address>None</Address>
+    <CityStateZip>Irvine,CA,92618</CityStateZip>
+    <Country>USA</Country>
+    <MeasurementUncertainty>-9999</MeasurementUncertainty>
+    <Authorization>None</Authorization>
+  </MetaData>
+</SampleData>
