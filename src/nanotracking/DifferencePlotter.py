@@ -39,8 +39,12 @@ text_shift = 0.05
                     
 @dataclass
 class NeedRefresh:
-    settings: list
+    settings: set
+    results: set
     tabulation: bool
+    peaks: bool
+    cumulative: bool
+    difference: bool
 
 class NTA():
     def __init__(self, datafolder, output_folder, filenames):
@@ -93,7 +97,7 @@ class NTA():
         }
         self.sums = []
         self.need_recompute = True
-        self.need_refresh = NeedRefresh(settings = [], tabulation = True)
+        self.need_refresh = NeedRefresh(settings = set(), results = set(), tabulation = True, peaks = False, cumulative = False, difference = False)
         self.configure_settings()
     def enable_table(self, width, margin_minimum_right, margin_left):
         table_settings = locals(); table_settings.pop('self')
@@ -242,6 +246,9 @@ class NTA():
         for tag in tags:
             group.add_subsetting(Setting(tag), tag)
         self.results_for_csv.add_setting(group.tag, group)
+        need_refresh = self.need_refresh
+        need_refresh.tabulation = True
+        need_refresh.results.add(group.tag)
         return group
     # def table_add_results_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
     #     '''
@@ -260,18 +267,21 @@ class NTA():
         self.peak_settings = peak_settings
         self.need_recompute = True
         self.need_refresh.tabulation = True
+        self.need_refresh.peaks = True
     def disable_peak_detection(self):
         self.peak_settings = None
     def enable_cumulative(self):
         self.cumulative_enabled = True
         self.need_recompute = True
         self.need_refresh.tabulation = True
+        self.need_refresh.cumulative = True
     def disable_cumulative(self):
         self.cumulative_enabled = False
     def enable_difference(self):
         self.difference_enabled = True
         self.need_recompute = True
         self.need_refresh.tabulation = True
+        self.need_refresh.difference = True
     def disable_difference(self):
         self.difference_enabled = False
     def configure_settings(self):
@@ -314,6 +324,7 @@ class NTA():
     #     need_refresh = self.need_refresh
 
     def compute(self, prep_tabulation = True):
+        need_refresh = self.need_refresh
         def vstack(arrays):
             if len(arrays) == 0:
                 try: return arrays[0]
@@ -322,15 +333,16 @@ class NTA():
         
         peak_settings = self.peak_settings
         peaks_enabled = (peak_settings is not None)
-        if peaks_enabled:
+        refresh_peaks = (peaks_enabled and need_refresh.peaks)
+        if refresh_peaks:
             lowpass_filter, kernel2_size, second_derivative_threshold = peak_settings['lowpass_filter'], peak_settings['kernel2_size'], peak_settings['second_derivative_threshold']
             all_filtered, all_maxima, all_rejected  = [], [], []
-        cumulative_enabled = self.cumulative_enabled
-        if cumulative_enabled:
+        refresh_cumulative = (self.cumulative_enabled and need_refresh.cumulative)
+        if refresh_cumulative:
             cumulative_sums = []
             cumsum_maxima = []
-        difference_enabled = self.difference_enabled
-        if difference_enabled:
+        refresh_difference = (self.difference_enabled and need_refresh.difference)
+        if refresh_difference:
             all_size_differences = []
 
         overall_min, overall_max = 0, 0
@@ -382,7 +394,7 @@ class NTA():
             # total_stds.append(total_std)
             # avg_histograms.append(avg_histograms)
 
-            if peaks_enabled:
+            if refresh_peaks:
                 bin_centers = bins + width/2
                 filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
                 maxima_candidates, = argrelextrema(filtered, np.greater)
@@ -396,11 +408,11 @@ class NTA():
                 all_filtered.append(filtered)
                 all_maxima.append(maxima)
                 all_rejected.append(rejected_candidates)
-            if cumulative_enabled:
+            if refresh_cumulative:
                 cumulative_sum = np.cumsum(sizes)*width
                 cumulative_sums.append(cumulative_sum)
                 cumsum_maxima.append(cumulative_sum.max())
-            if difference_enabled and previous_sizes is not None:
+            if refresh_difference and previous_sizes is not None:
                 size_differences = sizes - previous_sizes
                 all_size_differences.append(size_differences)
                 overall_max = max(size_differences.max(), overall_max)
@@ -415,14 +427,14 @@ class NTA():
         np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
         # np.save(tmp_filenames['total_stds'], vstack(total_stds))
         # np.save(tmp_filenames['avg_histograms'], vstack(avg_histograms))
-        if peaks_enabled:
+        if refresh_peaks:
             np.save(tmp_filenames['filtered_sizes'], vstack(all_filtered))
             self.maxima = all_maxima
             self.rejected_maxima = all_rejected
-        if cumulative_enabled:
+        if refresh_cumulative:
             np.save(tmp_filenames['cumulative_sums'], vstack(cumulative_sums))
             np.save(tmp_filenames['cumsum_maxima'], cumsum_maxima)
-        if difference_enabled:
+        if refresh_difference:
             np.save(tmp_filenames['size_differences'], vstack(all_size_differences))
         self.overall_min, self.overall_max = overall_min, overall_max
         self.need_recompute = False
@@ -631,6 +643,17 @@ class NTA():
         assert self.need_recompute == False, "Must run NTA.compute() first."
         assert self.need_refresh.tabulation == False, "Must run NTA.prepare_tabulation() first."
         compare_info(self.settings, self.samples, self.results_for_csv, self.output_folder)
+    def load_tempfile(self, key):
+        filename = self.tmp_filenames[key]+'.npy'
+        try:
+            data = np.load(filename)
+        except OSError:
+            raise Exception(f"Couldn't find {filename}.")
+        return data
+    def bins(self):
+        return self.load_tempfile('bins')
+    def sizes(self):
+        return self.load_tempfile('sizes')
     def plot(self, grid_color = '0.8', name = 'Ridgeline plot'):
         assert self.need_recompute == False, "Must run NTA.compute() first."
         num_of_plots, samples, colors, table_settings, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table_settings, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
@@ -641,7 +664,7 @@ class NTA():
         cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
         (_, height) = self.figsize
         tmp_filenames = self.tmp_filenames
-        all_bins, all_sizes = np.load(tmp_filenames['bins']+'.npy'), np.load(tmp_filenames['sizes']+'.npy')
+        all_bins, all_sizes = self.bins(), self.sizes()
         # avg_histograms, total_stds = np.load(tmp_filenames['avg_histograms']+'.npy'), np.load(tmp_filenames['total_stds']+'.npy')
         if peaks_enabled:
             rejected_maxima_marker, maxima_marker, filter_description, maxima_candidate_description, maxima_description = peak_settings['rejected_maxima_marker'], peak_settings['maxima_marker'], peak_settings['filter_description'], peak_settings['maxima_candidate_description'], peak_settings['maxima_description']
