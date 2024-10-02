@@ -13,7 +13,6 @@ import scipy
 from scipy.signal import argrelextrema
 from collections import OrderedDict
 from dataclasses import dataclass
-from copy import deepcopy
 import typing
 import matplotlib as mpl
 resolution = 200
@@ -25,7 +24,7 @@ from matplotlib import pyplot as plt, cm
 from .sample_class import Sample
 from .settings_classes import Setting, Settings
 from .InfoComparison import compare_info
-from .DrawTable import draw_table, Table
+from .DrawTable import Table
 # from nanotracking import data_handler
 
 volume = 2.3E-06
@@ -95,91 +94,22 @@ class NTA():
         self.configure_settings()
     def add_table(self, width, margin_minimum_right, margin_left):
         assert self.table is None, "Table already exists; must first call NTA.delete_table()."
-        self.table = Table(width, margin_minimum_right, margin_left)
+        table = Table(self, width, margin_minimum_right, margin_left)
+        self.table = table
         self.need_recompute = True
         self.need_refresh.tabulation = True
+        return table
     def delete_table(self):
         self.table = None
     def enable_table(self):
         self.table_enabled = True
     def disable_table(self):
-        self.table_settings = None
+        self.table_enabled = False
     def get_setting_or_result(self, tag):
         output = self.settings.by_tag(tag)
         if output is None: output = self.results_for_csv.by_tag(tag)
         assert output is not None, f'Could not find tag "{tag}" in settings or results_for_csv.'
         return output
-    def table_add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
-        '''
-        Adds multiple Setting objects to the table.
-        Example use case: specify column_number to group all specified settings into one column.
-
-        If column_number is not given, the next available column will be used.
-        Note: the column_number values of the specified Setting objects will be overwritten!
-        
-        If neither format_string nor format_callback are given, then for each cell in the column, the settings' individual format_strings will be used on separate lines.
-        To use format_string, reference settings' values using their tags in curly braces: for example, format_string = "Red has power {RedLaserPower}."
-        To use format_callback, define a function that accepts settings' values as arguments and returns a formatted (value-containing) string.
-
-        If format_callback is given, it will be used instead of format_string.
-        '''
-        if column_number is None:
-            column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
-        settings = [self.get_setting_or_result(tag) for tag in tags]
-        if format_string is None:
-            format_string = '\n'.join([setting.format_string for setting in settings])
-        def prepare_setting(setting):
-            setting.column_number = column_number
-            if column_name is not None: setting.column_name = column_name
-            if column_width is not None: setting.column_width = column_width
-        if len(settings) == 1:
-            setting = settings[0]
-            prepare_setting(setting)
-            setting.set_attributes(format_string = format_string, format_callback = format_callback)
-            self.table_add_setting(setting)
-            return
-        if format_callback is None:
-            group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
-        else:
-            group_suffix = format_callback.__name__
-        group = Setting('COLUMN_' + '_'.join(tags) + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
-        for setting in settings:
-            prepare_setting(setting)
-            group.add_subsetting(setting, setting.tag)
-        self.table_add_setting(group)
-    def table_add_results(self, results_group, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
-        if format_callback is None:
-            group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
-        else:
-            group_suffix = format_callback.__name__
-        new_column = deepcopy(results_group)
-        new_column.set_attributes(tag = results_group.tag + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
-        self.table_add_setting(new_column)
-    
-    def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
-        '''
-        Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
-        '''
-        experimental_unit = self.settings.by_tag('experimental_unit')
-        if column_number is None:
-            column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
-        experimental_unit.column_number = column_number
-        experimental_unit.column_name = column_name
-        experimental_unit.column_width = width
-        self.table_add_setting(experimental_unit)
-    def table_add_treatments_and_waits(self, treatments_column_name, treatments_width, waits_column_name, waits_width):
-        '''
-        For each treatment & wait-time listed in samples' info.md files, adds to the table
-        (1) a column for the treatment's name, and (2) a column for the time waited after applying the treatment.
-        '''
-        table_settings = self.table_settings
-        start_index = len(table_settings['column_names_without_treatmentsOrWaits'])
-        assert table_settings['treatments_and_waits'] is None, "Treatments and waits have already been added to the table."
-        table_settings['treatments_and_waits'] = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
-    def reset_columns(self):
-        table_settings = self.table_settings
-        table_settings['column_names'] = list(table_settings['columns_as_Settings_object'].column_names.keys())
-        table_settings['column_widths'] = table_settings['columns_as_Settings_object'].column_widths.copy()
 
     def new_results_group(self, *tags, callback = None):
         assert callback is not None, "Must specify callback."
@@ -394,14 +324,14 @@ class NTA():
         if prep_tabulation:
             self.prepare_tabulation()
     def prepare_tabulation(self):
-        table_settings, settings, num_of_plots, samples, unordered_samples = self.table_settings, self.settings, self.num_of_plots, self.samples, self.unordered_samples
-        table_enabled = (table_settings is not None)
+        table, settings, num_of_plots, samples, unordered_samples = self.table, self.settings, self.num_of_plots, self.samples, self.unordered_samples
+        table_enabled = self.table_enabled
         if table_enabled:
-            self.reset_columns() # If prepare_tabulation() has been run before, remove the columns for treatments and waits.
-            column_widths = table_settings['column_widths']
-            column_names = table_settings['column_names']
-            include_experimental_unit = table_settings['include_experimental_unit']
-            treatments_and_waits = table_settings['treatments_and_waits']
+            self.table.reset_columns() # If prepare_tabulation() has been run before, remove the columns for treatments and waits.
+            column_widths = table.column_widths
+            column_names = table.column_names
+            include_experimental_unit = table.include_experimental_unit
+            treatments_and_waits = table.treatments_and_waits
             include_treatments = (treatments_and_waits is not None)
             if include_treatments:
                 treatments_waits_columnIndex = treatments_and_waits[0]
@@ -477,7 +407,7 @@ class NTA():
                                 age = experimental_unit.age.get_value(sample)
                                 text += f"\n{age:.1f} d old" if age is not None else ''
                         row.append(text)
-                    columns = list(table_settings['columns_as_Settings_object'].column_numbers.items())
+                    columns = list(table.columns_as_Settings_object.column_numbers.items())
                     columns.sort()
                     for j, column in columns:
                         # content = '\n'.join(
@@ -541,9 +471,9 @@ class NTA():
         return self.load_tempfile('sizes')
     def plot(self, grid_color = '0.8', name = 'Ridgeline plot'):
         assert self.need_recompute == False, "Must run NTA.compute() first."
-        num_of_plots, samples, colors, table_settings, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table_settings, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
+        num_of_plots, samples, colors, table, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
         peaks_enabled = (peak_settings is not None)
-        table_enabled = (table_settings is not None)
+        table_enabled = self.table_enabled
         if table_enabled:
             assert self.need_refresh.tabulation == False, "Must run NTA.prepare_tabulation() first."
         cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
@@ -684,6 +614,6 @@ class NTA():
                 cell_height = table_top = 1
                 table_bottom = 0
             edges = {'right': right_edge_figure, 'bottom': table_bottom, 'top': table_top}
-            draw_table(fig, ax, self.rows, edges, table_settings, grid_color)
+            table.draw_table(fig, ax, self.rows, edges, grid_color)
 
         fig.savefig(f"{output_folder}/{name}.png", dpi = 300, bbox_inches='tight')
