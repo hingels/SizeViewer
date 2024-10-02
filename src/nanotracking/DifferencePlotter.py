@@ -25,7 +25,7 @@ from matplotlib import pyplot as plt, cm
 from .sample_class import Sample
 from .settings_classes import Setting, Settings
 from .InfoComparison import compare_info
-from .DrawTable import draw_table
+from .DrawTable import draw_table, Table
 # from nanotracking import data_handler
 
 volume = 2.3E-06
@@ -51,7 +51,8 @@ class NTA():
     def __init__(self, datafolder, output_folder, filenames):
         self.datafolder, self.output_folder, self.filenames = datafolder, output_folder, filenames
         os.makedirs(output_folder, exist_ok = True)
-        self.table_settings, self.peak_settings, self.cumulative_enabled, self.difference_enabled = None, None, False, False
+        self.table, self.peak_settings = None, None
+        self.table_enabled, self.cumulative_enabled, self.difference_enabled = False, False, False
         def generate_samples():
             for folder in os.listdir(datafolder):
                 sample = Sample(os.path.join(datafolder, folder), prefix, suffix, videos_file_prefix = prefix2)
@@ -92,36 +93,17 @@ class NTA():
         self.need_recompute = True
         self.need_refresh = NeedRefresh(settings = set(), results = set(), data = True, tabulation = True, peaks = False, cumulative = False, difference = False)
         self.configure_settings()
-    def enable_table(self, width, margin_minimum_right, margin_left):
-        table_settings = locals(); table_settings.pop('self')
-        table_settings.update({
-            'include_experimental_unit': False,
-            'treatments_and_waits': None,
-            'columns_as_Settings_object': Settings(),
-            'column_names': [],
-            'column_widths': [],
-            'column_names_without_treatmentsOrWaits': [],
-            'column_widths_without_treatmentsOrWaits': []
-        })
-        self.table_settings = table_settings
+    def add_table(self, width, margin_minimum_right, margin_left):
+        assert self.table is None, "Table already exists; must first call NTA.delete_table()."
+        self.table = Table(width, margin_minimum_right, margin_left)
         self.need_recompute = True
         self.need_refresh.tabulation = True
+    def delete_table(self):
+        self.table = None
+    def enable_table(self):
+        self.table_enabled = True
     def disable_table(self):
-        self.table_settings = None    
-    def table_add_setting(self, setting: Setting):
-        tag = setting.tag
-        settings = self.table_settings['columns_as_Settings_object']
-        assert tag not in settings.tags, f'Setting with tag "{tag}" already added to table.'
-        if setting.column_number is None:
-            setting.column_number = len(settings.column_widths)
-        settings.add_setting(setting.tag, setting)
-    def table_add_new_setting(self, tag, column_name, column_width, column_number = None):
-        assert tag not in self.settings.tags, f'Setting with tag "{tag}" already created.'
-        if column_number is None:
-            column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
-        setting = Setting(tag, column_name = column_name, column_width = column_width, column_number = column_number)
-        self.settings.add_setting(tag, setting)
-        self.table_add_setting(setting)
+        self.table_settings = None
     def get_setting_or_result(self, tag):
         output = self.settings.by_tag(tag)
         if output is None: output = self.results_for_csv.by_tag(tag)

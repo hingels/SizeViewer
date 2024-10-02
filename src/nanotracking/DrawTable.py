@@ -1,6 +1,33 @@
 import matplotlib as mpl
-from .settings_classes import Setting
+from .settings_classes import Setting, Settings
 
+
+class Table():
+    def __init__(self,
+            width, margin_minimum_right, margin_left,
+            include_experimental_unit=False,
+            treatments_and_waits=None,
+            columns_as_Settings_object=None,
+            column_names=None,
+            column_widths=None,
+            column_names_without_treatmentsOrWaits=None,
+            column_widths_without_treatmentsOrWaits=None):
+        if columns_as_Settings_object is None:
+            columns_as_Settings_object = Settings()
+        if column_names is None: column_names = []
+        if column_widths is None: column_widths = []
+        if column_names_without_treatmentsOrWaits is None: column_names_without_treatmentsOrWaits = []
+        if column_widths_without_treatmentsOrWaits is None: column_widths_without_treatmentsOrWaits = []
+        self.width, self.margin_minimum_right, self.margin_left = width, margin_minimum_right, margin_left
+        self.include_experimental_unit, self.treatments_and_waits = include_experimental_unit, treatments_and_waits
+        self.columns_as_Settings_object, self.column_names, self.column_widths, self.column_names_without_treatmentsOrWaits, self.column_widths_without_treatmentsOrWaits = columns_as_Settings_object, column_names, column_widths, column_names_without_treatmentsOrWaits, column_widths_without_treatmentsOrWaits
+    def table_add_setting(self, setting: Setting):
+        tag = setting.tag
+        settings = self.columns_as_Settings_object
+        assert tag not in settings.tags, f'Setting with tag "{tag}" already added to table.'
+        if setting.column_number is None:
+            setting.column_number = len(settings.column_widths)
+        settings.add_setting(setting.tag, setting)
 
 def draw_table(fig, ax, rows, edges, table_settings, grid_color):
     right_edge_figure = edges['right']
