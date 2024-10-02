@@ -1,3 +1,5 @@
+- Fix bug: time since above isn't blank for the first row
+- Transfer Colab demo into a Runme file to track in git
 - Add ability to save user-specified calculations to NumPy files
 - Add auto-refresh option
 - Add file name templates to demo

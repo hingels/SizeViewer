@@ -84,17 +84,9 @@ class NTA():
             'fulldata_size_sums': os.path.join(output_folder, 'fulldata_size_sums'),
             'cumulative_sums': os.path.join(output_folder, 'cumulative_sums'),
             'cumsum_maxima': os.path.join(output_folder, 'cumsum_maxima'),
-            'size_differences': os.path.join(output_folder, 'size_differences')#,
-            # 'avg_histograms': os.path.join(output_folder, 'avg_histograms'),
-            # 'total_stds': os.path.join(output_folder, 'total_stds')
+            'size_differences': os.path.join(output_folder, 'size_differences')
         }
-        # self.setting_columnNames = []
-        # self.setting_columnWidths = []
         self.results_for_csv = Settings()
-        self.result_names = {
-            'time': None,
-            'concentration': None
-        }
         self.sums = []
         self.need_recompute = True
         self.need_refresh = NeedRefresh(settings = set(), results = set(), tabulation = True, peaks = False, cumulative = False, difference = False)
@@ -104,7 +96,6 @@ class NTA():
         table_settings.update({
             'include_experimental_unit': False,
             'treatments_and_waits': None,
-            # 'setting_tags': [],
             'columns_as_Settings_object': Settings(),
             'column_names': [],
             'column_widths': [],
@@ -116,17 +107,6 @@ class NTA():
         self.need_refresh.tabulation = True
     def disable_table(self):
         self.table_settings = None    
-    # # def table_add_setting(self, setting_tag, name, width):
-    # # def table_add_setting(self, name, width):
-    # def table_add_column(self, name, width):
-    #     table_settings = self.table_settings
-    #     # # table_settings['setting_tags'].append(setting_tag)
-    #     # table_settings['column_names'].append(name)
-    #     # table_settings['column_widths'].append(width)
-    #     # # self.setting_columnNames.append(name)
-    #     # # self.setting_columnWidths.append(width)
-    #     table_settings['column_names_without_treatmentsOrWaits'].append(name)
-    #     table_settings['column_widths_without_treatmentsOrWaits'].append(width)
     def table_add_setting(self, setting: Setting):
         tag = setting.tag
         settings = self.table_settings['columns_as_Settings_object']
@@ -167,8 +147,6 @@ class NTA():
             format_string = '\n'.join([setting.format_string for setting in settings])
         def prepare_setting(setting):
             setting.column_number = column_number
-            # setting.format_string = format_string
-            # setting.format_callback = format_callback
             if column_name is not None: setting.column_name = column_name
             if column_width is not None: setting.column_width = column_width
         if len(settings) == 1:
@@ -187,12 +165,6 @@ class NTA():
             group.add_subsetting(setting, setting.tag)
         self.table_add_setting(group)
     def table_add_results(self, results_group, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
-        # tags = results_group.subsettings.keys()
-        # return self.table_add_settings_by_tag(*tags, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
-        
-        # for setting in results_group.subsettings.values():
-        #     self.table_add_setting(setting)
-
         if format_callback is None:
             group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
         else:
@@ -205,7 +177,6 @@ class NTA():
         '''
         Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
         '''
-        # self.table_add_column(column_name, width)
         experimental_unit = self.settings.by_tag('experimental_unit')
         if column_number is None:
             column_number = len(self.table_settings['columns_as_Settings_object'].column_widths)
@@ -222,24 +193,11 @@ class NTA():
         start_index = len(table_settings['column_names_without_treatmentsOrWaits'])
         assert table_settings['treatments_and_waits'] is None, "Treatments and waits have already been added to the table."
         table_settings['treatments_and_waits'] = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
-        # column_names_without_treatmentsOrWaits = self.column_names_without_treatmentsOrWaits
-        # start_index = len(column_names_without_treatmentsOrWaits)
-        # assert self.treatments_and_waits is None, "Treatments and waits have already been added to the table."
-        # self.treatments_and_waits = [start_index, (treatments_column_name, treatments_width), (waits_column_name, waits_width)]
     def reset_columns(self):
         table_settings = self.table_settings
         table_settings['column_names'] = list(table_settings['columns_as_Settings_object'].column_names.keys())
         table_settings['column_widths'] = table_settings['columns_as_Settings_object'].column_widths.copy()
 
-    # def table_add_time(self, name, width):
-    #     # self.table_add_column(name, width)
-    #     self.table_add_settings_by_tag('time', column_name = name, column_width = width)
-    #     self.result_names['time'] = name
-    # def table_add_concentration(self, name, width):
-    #     # self.table_add_column(name, width)
-    #     self.table_add_new_setting('concentration', name, width)
-    #     self.result_names['concentration'] = name
-    
     def new_results_group(self, *tags, callback = None):
         assert callback is not None, "Must specify callback."
         group = Setting('RESULTS_' + '_'.join(tags), value_callback = callback)
@@ -250,11 +208,6 @@ class NTA():
         need_refresh.tabulation = True
         need_refresh.results.add(group.tag)
         return group
-    # def table_add_results_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
-    #     '''
-    #     Alias for table_add_settings_by_tag with is_result = True.
-    #     '''
-    #     self.table_add_settings_by_tag(*tags, is_result = True, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
             
     def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
         peak_settings = locals(); peak_settings.pop('self')
@@ -316,7 +269,6 @@ class NTA():
         settings_list = [self.samples_setting, *md_settings, *xml_settings]
         settings = Settings(OrderedDict({setting.tag: setting for setting in settings_list}))
         self.settings = settings
-        # self.need_reconfig_settings = False
     # def refresh(self):
     #     """
     #     Applies any changes made to this NTA object, such as the addition of a table to the plot.
@@ -350,7 +302,6 @@ class NTA():
         sums = self.sums
         bins = None
         all_bins, all_sizes = [], []
-        # total_stds, avg_histograms = [], []
         fulldata_size_sums = []
         for sample in self.samples:
             full_data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
@@ -441,7 +392,6 @@ class NTA():
         if prep_tabulation:
             self.prepare_tabulation()
     def prepare_tabulation(self):
-        # assert self.need_reconfig_settings == False, "Must run NTA.configure_settings() first."
         table_settings, settings, num_of_plots, samples, unordered_samples = self.table_settings, self.settings, self.num_of_plots, self.samples, self.unordered_samples
         table_enabled = (table_settings is not None)
         if table_enabled:
@@ -455,9 +405,6 @@ class NTA():
                 treatments_waits_columnIndex = treatments_and_waits[0]
             else:
                 treatments_waits_columnIndex = -1
-        result_names = self.result_names
-        time_enabled, concentration_enabled = (result_names['time'] is not None), (result_names['concentration'] is not None)
-        previous_setting = settings.by_tag('previous')
         
         results_for_csv = self.results_for_csv
         def generate_rows():
@@ -489,7 +436,6 @@ class NTA():
                             continue
                         column_quantities[tag] = max(column_quantities[tag], quantity)
             if table_enabled:
-                # for i, name in enumerate(column_names):
                 for i in range(len(column_names) + 1): # +1 accounts for the case where len(column_names) = 1. Still may want to insert treatments_and_waits columns at index 0.
                     if i == treatments_waits_columnIndex:
                         num_of_treatments = column_quantities['treatment']
@@ -506,13 +452,7 @@ class NTA():
                                 column_names.insert(i + index, wait_column_name.format(wait_number = j + 1))
                                 column_widths.insert(i + index, wait_column_width)
                                 index += 1
-            
-            # results_for_csv.add_subsetting(previous_setting, 'previous')
-            # results_for_csv.add_subsetting(Setting("Time since previous (s)"), 'time_since_previous')
-            # results_for_csv.add_subsetting(Setting(f"Concentration\n<{top_nm}nm\n(counts/mL)"), 'total_conc_under_topnm')
-            # results_for_csv.add_subsetting(Setting("Concentration\n(counts/mL)"), 'total_conc')
-                
-            time_of_above = None
+                            
             for i in range(num_of_plots):
                 row = []
                 sample = samples[i]
@@ -535,7 +475,6 @@ class NTA():
                                 age = experimental_unit.age.get_value(sample)
                                 text += f"\n{age:.1f} d old" if age is not None else ''
                         row.append(text)
-                    # columns = list(settings.column_numbers.items())
                     columns = list(table_settings['columns_as_Settings_object'].column_numbers.items())
                     columns.sort()
                     for j, column in columns:
@@ -550,8 +489,6 @@ class NTA():
                             if group.format_callback is not None:
                                 row.append(group.format_callback(*(setting.get_value(sample) for setting in grouped_settings)))
                                 continue
-                            # print(group.subsettings)
-                            # print(group.tag)
                             row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
                         elif column[0].tag.startswith('RESULTS'):
                             group = column[0]
@@ -573,68 +510,14 @@ class NTA():
                                 row.append(setting.format_callback(value))
 
                 
-                # exposure = settings.by_tag('Exposure').get_value(sample)
-                # gain = settings.by_tag('Gain').get_value(sample)
-                # row.append(f"{exposure} ms,\n{gain} dB")
-                # detection_mode = settings.by_tag('DetectionThresholdType').get_value(sample)
-                # detection_threshold = settings.by_tag('DetectionThreshold').get_value(sample)
                 # if detection_threshold is None:
                 #     row.append(detection_mode)
                 # else:
                 #     row.append(f"{detection_mode}\n{detection_threshold}")
-                # framerate = settings.by_tag('FrameRate').get_value(sample)
-                # frames_per_video = settings.by_tag('FramesPerVideo').get_value(sample)
-                # video_duration = frames_per_video / framerate
-                # if video_duration.is_integer():
-                #     video_duration = int(video_duration)        
-                # num_of_videos = settings.by_tag('NumOfVideos').get_value(sample)
-                # row.append(f"{video_duration}x{num_of_videos}")
-                # stir_time = settings.by_tag('StirredTime').get_value(sample)
-                # stir_rpm = settings.by_tag('StirrerSpeed').get_value(sample)
-                # row.append(f"{stir_time}x{stir_rpm}")
-                # ID = settings.by_tag('ID').get_value(sample)
-                # row.append('\n'.join((ID[0:4], ID[4:8], ID[8:12])))
-                
-                # previous = settings.by_tag('previous').get_value(sample)
                 # results_for_csv.previous.set_value(sample, previous)
-                # ID_of_previous = None
-                # time = settings.by_tag('time').get_value(sample)
-                # time_since_previous = None
-                # if previous is not None:
-                #     if previous not in unordered_samples:
-                #         time_since_previous = '?'
-                #     else:
-                #         previous_sample = unordered_samples[previous]
-                #         ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
-                #         time_of_previous = settings.by_tag('time').get_value(previous_sample)
-                #         time_since_previous = int((time - time_of_previous).total_seconds())
                 # results_for_csv.time_since_previous.set_value(sample, time_since_previous)
-                # # # if ID_of_previous is not None:
-                # # #     ID_of_previous = '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
-                # # # row.append(ID_of_previous)
-                # # if time_enabled:
-                # #     text = []
-                # #     time = settings.by_tag('time').get_value(sample)
-                # #     time_since_above = None
-                # #     if time_of_above is not None:
-                # #         time_since_above = int((time - time_of_above).total_seconds())
-                # #         text.append(f"{time_since_above} since above")
-                # #     time_of_above = time
-
-                # #     if previous is not None:
-                # #         text.append(f"{time_since_previous} since previous")
-
-                # #     # column_names.append(result_names['time'])
-                # #     row.append('\n'.join(text))
-                # #     text.clear()
-                
-                # data_sums = sums[i]
                 # results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
                 # results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
-                # # if concentration_enabled:
-                # #     text.append(f"Total: {data_sums[1][1]:.2E}")
-                # #     text.append(f"<{top_nm}nm: {data_sums[0][1]:.2E}")
-                # #     row.append('\n'.join(text))
                 row.append("")
                 yield row
         self.rows = tuple(generate_rows())
@@ -691,8 +574,6 @@ class NTA():
             sample = samples[i]
             bins, sizes = all_bins[i], all_sizes[i]
             # bins, sizes = data_handler.read_data(sample_filename = sample.filename, outputs_path = output_folder, num_data_points = num_data_points)
-            # print(len(bins))
-            # print(bins)
             width = bins[1] - bins[0]
             bin_centers = bins + width/2
             # avg_histogram, total_std = avg_histograms[i], total_stds[i]
@@ -731,8 +612,6 @@ class NTA():
                 plt.xlabel("Diameter (nm)")
                 plt.ticklabel_format(style = 'sci', axis = 'y', scilimits = (0, 0))
                 ax.spines.left.set_visible(True)
-                # plt.axhline(0, color = 'black')
-                # break
             else:
                 ax.spines['bottom'].set_position(('data', 0))
                 plt.yticks([])
