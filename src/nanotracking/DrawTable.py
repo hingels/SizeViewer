@@ -25,14 +25,14 @@ class Table():
         self.include_experimental_unit, self.treatments_and_waits = include_experimental_unit, treatments_and_waits
         self.columns_as_Settings_object, self.column_names, self.column_widths, self.column_names_without_treatmentsOrWaits, self.column_widths_without_treatmentsOrWaits = columns_as_Settings_object, column_names, column_widths, column_names_without_treatmentsOrWaits, column_widths_without_treatmentsOrWaits
         self.fig, self.ax, self.table_plot = None, None, None
-    def table_add_setting(self, setting: Setting):
+    def add_setting(self, setting: Setting):
         tag = setting.tag
         settings = self.columns_as_Settings_object
         assert tag not in settings.tags, f'Setting with tag "{tag}" already added to table.'
         if setting.column_number is None:
             setting.column_number = len(settings.column_widths)
         settings.add_setting(setting.tag, setting)
-    def table_add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
+    def add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
         '''
         Adds multiple Setting objects to the table.
         Example use case: specify column_number to group all specified settings into one column.
@@ -60,7 +60,7 @@ class Table():
             setting = settings[0]
             prepare_setting(setting)
             setting.set_attributes(format_string = format_string, format_callback = format_callback)
-            self.table_add_setting(setting)
+            self.add_setting(setting)
             return
         if format_callback is None:
             group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
@@ -70,16 +70,16 @@ class Table():
         for setting in settings:
             prepare_setting(setting)
             group.add_subsetting(setting, setting.tag)
-        self.table_add_setting(group)
-    def table_add_results(self, results_group, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
+        self.add_setting(group)
+    def add_results(self, results_group, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
         if format_callback is None:
             group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
         else:
             group_suffix = format_callback.__name__
         new_column = deepcopy(results_group)
         new_column.set_attributes(tag = results_group.tag + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
-        self.table_add_setting(new_column)
-    def table_add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
+        self.add_setting(new_column)
+    def add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
         '''
         Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
         '''
@@ -89,8 +89,8 @@ class Table():
         experimental_unit.column_number = column_number
         experimental_unit.column_name = column_name
         experimental_unit.column_width = width
-        self.table_add_setting(experimental_unit)
-    def table_add_treatments_and_waits(self, treatments_column_name, treatments_width, waits_column_name, waits_width):
+        self.add_setting(experimental_unit)
+    def add_treatments_and_waits(self, treatments_column_name, treatments_width, waits_column_name, waits_width):
         '''
         For each treatment & wait-time listed in samples' info.md files, adds to the table
         (1) a column for the treatment's name, and (2) a column for the time waited after applying the treatment.

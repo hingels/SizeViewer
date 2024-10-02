@@ -25,32 +25,32 @@ class Test_Table(unittest.TestCase):
     def add_columns(self):
         nta = self.nta
         table = self.table
-        table.table_add_treatments_and_waits("Treatment\n{treatment_number}\n(µM)", 0.2, "4°C\nwait\n{wait_number}\n(h)", 0.07)
+        table.add_treatments_and_waits("Treatment\n{treatment_number}\n(µM)", 0.2, "4°C\nwait\n{wait_number}\n(h)", 0.07)
         # names = ["Filter\ncut-on\n(nm)", "Power\n(mW)", "Exposure,\ngain", "Detection\nsetting", "Video sec\nx quantity", "Stir sec\nx RPM", "ID", "ID of\nprevious"]
         # widths = [0.1, 0.19, 0.14, 0.19, 0.16, 0.12, 0.1, 0.13]
         # assert len(names) == len(widths), f"{len(names)=} does not equal {len(widths)=}"
-        table.table_add_settings_by_tag('filter', column_name = "Filter\ncut-on\n(nm)", column_width = 0.1)
-        table.table_add_settings_by_tag('RedLaserPower', 'GreenLaserPower', 'BlueLaserPower', column_name = "Power\n(mW)", column_width = 0.19)
-        table.table_add_settings_by_tag('Exposure', column_name = "Exposure,\ngain", column_width = 0.14)
+        table.add_settings_by_tag('filter', column_name = "Filter\ncut-on\n(nm)", column_width = 0.1)
+        table.add_settings_by_tag('RedLaserPower', 'GreenLaserPower', 'BlueLaserPower', column_name = "Power\n(mW)", column_width = 0.19)
+        table.add_settings_by_tag('Exposure', column_name = "Exposure,\ngain", column_width = 0.14)
         def get_detection_info(threshold_type, threshold):
             if threshold_type == 'Polydisperse': return threshold_type
             return f"{threshold_type}\n{threshold}"
-        table.table_add_settings_by_tag('DetectionThresholdType', 'DetectionThreshold', column_name = "Detection\nsetting", column_width = 0.19, format_callback = get_detection_info)
+        table.add_settings_by_tag('DetectionThresholdType', 'DetectionThreshold', column_name = "Detection\nsetting", column_width = 0.19, format_callback = get_detection_info)
         
         def get_video_info(framerate, frames_per_video, num_of_videos):
             video_duration = frames_per_video / framerate
             if video_duration.is_integer():
                 video_duration = int(video_duration)
             return f"{video_duration}x{num_of_videos}"
-        table.table_add_settings_by_tag('FrameRate', 'FramesPerVideo', 'NumOfVideos', column_name = "Video sec\nx quantity", column_width = 0.16, format_callback = get_video_info)
+        table.add_settings_by_tag('FrameRate', 'FramesPerVideo', 'NumOfVideos', column_name = "Video sec\nx quantity", column_width = 0.16, format_callback = get_video_info)
 
         def get_stir_info(stir_time, stir_rpm):
             return f"{stir_time}x{stir_rpm}"
-        table.table_add_settings_by_tag('StirredTime', 'StirrerSpeed', column_name = "Stir sec\nx RPM", column_width = 0.12, format_callback = get_stir_info)
+        table.add_settings_by_tag('StirredTime', 'StirrerSpeed', column_name = "Stir sec\nx RPM", column_width = 0.12, format_callback = get_stir_info)
         
         def get_ID_info(ID):
             return '\n'.join((ID[0:4], ID[4:8], ID[8:12]))
-        table.table_add_settings_by_tag('ID', column_name = "ID", column_width = 0.1, format_callback = get_ID_info)
+        table.add_settings_by_tag('ID', column_name = "ID", column_width = 0.1, format_callback = get_ID_info)
         
         settings = nta.settings
         unordered_samples = nta.unordered_samples
@@ -61,7 +61,7 @@ class Test_Table(unittest.TestCase):
             return '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
         # previous_ID_setting = settings_classes.Setting('previous_ID_setting', column_name = "ID of\nprevious", column_width = 0.13, format_callback = get_previous_ID_info)
         # nta.settings.add_setting(previous_ID_setting.tag, previous_ID_setting)
-        table.table_add_settings_by_tag('previous', column_name = "ID of\nprevious", column_width = 0.13, format_callback = get_previous_ID_info)
+        table.add_settings_by_tag('previous', column_name = "ID of\nprevious", column_width = 0.13, format_callback = get_previous_ID_info)
 
         times = settings.by_tag('time')
         sums = nta.sums
@@ -97,18 +97,18 @@ class Test_Table(unittest.TestCase):
             if time_since_previous is not None:
                 text.append(f"{time_since_previous} since previous")
             return '\n'.join(text)
-        # table.table_add_time("Time (s)", 0.33)
-        # table.table_add_concentration("Concentration\n(counts/mL)", 0.3)
-        # table.table_add_settings_by_tag('time', 'time_since_previous', 'time_since_above', column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
-        table.table_add_results(results_group, column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
+        # table.add_time("Time (s)", 0.33)
+        # table.add_concentration("Concentration\n(counts/mL)", 0.3)
+        # table.add_settings_by_tag('time', 'time_since_previous', 'time_since_above', column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
+        table.add_results(results_group, column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
 
         def get_conc_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
             return f"Total: {total_conc}\n<{top_nm}nm: {total_conc_under_topnm}"
-        table.table_add_results(results_group, column_name = "Concentration\n(counts/mL)", column_width = 0.3, format_callback = get_conc_info)
+        table.add_results(results_group, column_name = "Concentration\n(counts/mL)", column_width = 0.3, format_callback = get_conc_info)
 
         def get_sample_name(sample):
             return sample.name
-        table.table_add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format_callback = get_sample_name)
+        table.add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format_callback = get_sample_name)
             
 
     def get_num_columns(self):
