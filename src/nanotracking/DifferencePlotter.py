@@ -41,6 +41,7 @@ text_shift = 0.05
 class NeedRefresh:
     settings: set
     results: set
+    data: bool
     tabulation: bool
     peaks: bool
     cumulative: bool
@@ -89,7 +90,7 @@ class NTA():
         self.results_for_csv = Settings()
         self.sums = []
         self.need_recompute = True
-        self.need_refresh = NeedRefresh(settings = set(), results = set(), tabulation = True, peaks = False, cumulative = False, difference = False)
+        self.need_refresh = NeedRefresh(settings = set(), results = set(), data = True, tabulation = True, peaks = False, cumulative = False, difference = False)
         self.configure_settings()
     def enable_table(self, width, margin_minimum_right, margin_left):
         table_settings = locals(); table_settings.pop('self')
@@ -275,6 +276,15 @@ class NTA():
     #     """
     #     need_refresh = self.need_refresh
 
+    def data_of_sample(self, sample):
+        """
+        Get the size distribution of a sample, using either its name (a string) or the Sample object itself.
+        Returns a Pandas DataFrame.
+        """
+        if type(sample) is not Sample:
+            assert type(sample) is str, "Argument of data_of_sample must be of type Sample or string."
+            sample = self.unordered_samples[sample]
+        return pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
     def compute(self, prep_tabulation = True):
         need_refresh = self.need_refresh
         def vstack(arrays):
@@ -296,43 +306,51 @@ class NTA():
         refresh_difference = (self.difference_enabled and need_refresh.difference)
         if refresh_difference:
             all_size_differences = []
+        refresh_data = need_refresh.data
 
         overall_min, overall_max = 0, 0
         previous_sizes = None
         sums = self.sums
-        bins = None
-        all_bins, all_sizes = [], []
+        last_bins = None
+        if refresh_data:
+            all_bins, all_sizes = [], []
+        else:
+            all_bins, all_sizes = self.bins(), self.sizes()
         fulldata_size_sums = []
-        for sample in self.samples:
-            full_data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
-            data = full_data.iloc[:num_data_points, :]
-            new_bins = data['/LowerBinDiameter_[nm]']
-            
-            top_nm = max(data['UpperBinDiameter_[nm]'])
-            if top_nm.is_integer():
-                top_nm = int(top_nm)
-            
-            if bins is not None:
-                assert np.all(new_bins == bins) == True, 'Unequal sequence of bins between samples detected!'
-            bins = new_bins
-            sizes = data['PSD_corrected_[counts/mL/nm]']
-            # data_handler.parse_data(bins.to_numpy(dtype = np.double), sizes.to_numpy(dtype = np.double), sample.filename, self.output_folder, num_data_points)
-            # data_handler.parse_data(
-            #     bins = bins.to_numpy(dtype = np.double),
-            #     sizes = sizes.to_numpy(dtype = np.double),
-            #     sample_filename = sample.filename,
-            #     outputs_path = self.output_folder,
-            #     num_data_points = num_data_points)
-            width = bins[1] - bins[0]
-            fulldata_size_sum = np.sum(full_data['PSD_corrected_[counts/mL/nm]'])
-            
-            all_bins.append(bins)
-            all_sizes.append(sizes)
-            fulldata_size_sums.append(fulldata_size_sum)
-            sums.append((
-                ('All data', fulldata_size_sum*width),
-                (top_nm, np.sum(sizes*width))
-            ))
+        data_of_sample = self.data_of_sample
+        for i, sample in enumerate(self.samples):
+            if not refresh_data:
+                bins, sizes = all_bins[i], all_sizes[i]
+                width = bins[1] - bins[0]
+            else:
+                full_data = data_of_sample(sample)
+                data = full_data.iloc[:num_data_points, :]
+                bins, sizes = data['/LowerBinDiameter_[nm]'], data['PSD_corrected_[counts/mL/nm]']
+                
+                top_nm = max(data['UpperBinDiameter_[nm]'])
+                if top_nm.is_integer():
+                    top_nm = int(top_nm)
+                
+                if last_bins is not None:
+                    assert np.all(bins == last_bins) == True, 'Unequal sequence of bins between samples detected!'
+                last_bins = bins
+                # data_handler.parse_data(bins.to_numpy(dtype = np.double), sizes.to_numpy(dtype = np.double), sample.filename, self.output_folder, num_data_points)
+                # data_handler.parse_data(
+                #     bins = bins.to_numpy(dtype = np.double),
+                #     sizes = sizes.to_numpy(dtype = np.double),
+                #     sample_filename = sample.filename,
+                #     outputs_path = self.output_folder,
+                #     num_data_points = num_data_points)
+                width = bins[1] - bins[0]
+
+                fulldata_size_sum = np.sum(full_data['PSD_corrected_[counts/mL/nm]'])
+                all_bins.append(bins)
+                all_sizes.append(sizes)
+                fulldata_size_sums.append(fulldata_size_sum)
+                sums.append((
+                    ('All data', fulldata_size_sum*width),
+                    (top_nm, np.sum(sizes*width))
+                ))
 
             # videos = sample.videos
             # all_histograms = np.array([np.histogram(video, bins = bins)[0] for video in videos])
@@ -368,14 +386,17 @@ class NTA():
                 all_size_differences.append(size_differences)
                 overall_max = max(size_differences.max(), overall_max)
                 overall_min = min(size_differences.min(), overall_min)
-            overall_max = max(sizes.max(), overall_max)
-            overall_min = min(sizes.min(), overall_min)
+            if refresh_data or refresh_difference:
+                overall_max = max(sizes.max(), overall_max)
+                overall_min = min(sizes.min(), overall_min)
             previous_sizes = sizes
         
         tmp_filenames = self.tmp_filenames
-        np.save(tmp_filenames['bins'], vstack(all_bins))
-        np.save(tmp_filenames['sizes'], vstack(all_sizes))
-        np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
+        if refresh_data:
+            np.save(tmp_filenames['bins'], vstack(all_bins))
+            np.save(tmp_filenames['sizes'], vstack(all_sizes))
+            np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
+            self.overall_min, self.overall_max = overall_min, overall_max
         # np.save(tmp_filenames['total_stds'], vstack(total_stds))
         # np.save(tmp_filenames['avg_histograms'], vstack(avg_histograms))
         if refresh_peaks:
@@ -387,7 +408,6 @@ class NTA():
             np.save(tmp_filenames['cumsum_maxima'], cumsum_maxima)
         if refresh_difference:
             np.save(tmp_filenames['size_differences'], vstack(all_size_differences))
-        self.overall_min, self.overall_max = overall_min, overall_max
         self.need_recompute = False
         if prep_tabulation:
             self.prepare_tabulation()

@@ -1,3 +1,4 @@
+- Revisit the `particles` and `videos` attributes of Sample
 - Fix bug: time since above isn't blank for the first row
 - Transfer Colab demo into a Runme file to track in git
 - Add ability to save user-specified calculations to NumPy files
