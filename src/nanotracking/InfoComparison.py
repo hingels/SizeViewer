@@ -10,13 +10,13 @@ import os
 import pandas as pd
 import numpy as np
 
-from .settings_classes import Setting
+from .settings_classes import Calculation, Setting
 
 
-def compare_info(settings, samples, results_object, output_folder):
+def compare_info(settings, samples, calculations, output_folder):
     blank = Setting('')
     
-    def generate_setting_objects():
+    def generate_entries():
         for tag, setting in settings.tags.items():
             if setting.tag == 'Name': continue
             if setting.hidden is False:
@@ -29,50 +29,58 @@ def compare_info(settings, samples, results_object, output_folder):
                 name = subsetting.name if units == '' else f"{subsetting.name} ({units})"
                 yield name, subsetting
         yield '', blank
-        yield 'RESULTS:', blank
-        for result in results_object.tags.values():
-            name = result.name.replace('\n', ' ')
-            units = setting.units
+        yield 'CALCULATIONS:', blank
+        for name, calculation in calculations.items():
+            name = name.replace('\n', ' ')
+            units = calculation.units
             if units != '': name += f" ({units})"
-            yield name, result
-    all_names, setting_objects = zip(*generate_setting_objects())
-    
-    same_valued_settings = []
-    different_valued_settings = []
-    for name, setting in zip(all_names, setting_objects):
-        if setting is blank:
-            same_valued_settings.append((name, setting))
-            different_valued_settings.append((name, setting))
+            yield name, calculation
+    entry_names, entries = zip(*generate_entries())
+    def get_values():
+        for entry_name, entry in zip(entry_names, entries):
+            if type(entry) is Setting:
+                yield entry_name, entry, [sample.filename for sample in samples], [entry.get_value(sample) for sample in samples]
+                continue
+            for format_name in entry.formats.keys():
+                yield entry_name, entry, [sample.filename for sample in samples], [entry.apply_format(format_name, sample) for sample in samples]
+    entry_names, entries, filenames, values = zip(*get_values())
+
+    same_valued_entries = []
+    different_valued_entries = []
+    for entry_name, entry, sample_filenames, sample_values in zip(entry_names, entries, filenames, values):
+        if entry is blank:
+            same_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
+            different_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
             continue
-        sample_values = np.array([setting.get_value(sample) for sample in samples], dtype = object)
+        sample_values = np.array(sample_values, dtype = object)
         are_same = np.all(sample_values == sample_values[0])
         if are_same:
-            same_valued_settings.append((name, setting))
+            same_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
         else:
-            different_valued_settings.append((name, setting))    
+            different_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
     
     all_csv_dataframe = pd.DataFrame(
         data = (
-            pd.Series((setting.get_value(sample) for sample in samples), index = [sample.filename for sample in samples])
-            for setting in setting_objects
-        ), index = all_names
+            pd.Series(sample_values, index = sample_filenames)
+            for sample_filenames, entry, sample_values in zip(filenames, entries, values)
+        ), index = entry_names
     )
     all_csv_dataframe.to_csv(os.path.join(output_folder, 'all.csv'))
     
-    names_of_same, settings_of_same = zip(*same_valued_settings)
+    names_of_same, entries_of_same, filenames_of_same, values_of_same = zip(*same_valued_entries)
     same_values_csv_dataframe = pd.DataFrame(
         data = (
-            pd.Series((setting.get_value(sample) for sample in samples), index = [sample.filename for sample in samples])
-            for setting in settings_of_same
+            pd.Series(sample_values_of_same, index = sample_filenames_of_same)
+            for sample_filenames_of_same, entry, sample_values_of_same in zip(filenames_of_same, entries_of_same, values_of_same)
         ), index = names_of_same
     )
     same_values_csv_dataframe.to_csv(os.path.join(output_folder, 'same_values.csv'))
     
-    names_of_different, settings_of_different = zip(*different_valued_settings)
+    names_of_different, entries_of_different, filenames_of_different, values_of_different = zip(*different_valued_entries)
     different_values_csv_dataframe = pd.DataFrame(
         data = (
-            pd.Series((setting.get_value(sample) for sample in samples), index = [sample.filename for sample in samples])
-            for setting in settings_of_different
+            pd.Series(sample_values_of_different, index = sample_filenames_of_different)
+            for sample_filenames_of_different, entry, sample_values_of_different in zip(filenames_of_different, entries_of_different, values_of_different)
         ), index = names_of_different
     )
     different_values_csv_dataframe.to_csv(os.path.join(output_folder, 'different_values.csv'))

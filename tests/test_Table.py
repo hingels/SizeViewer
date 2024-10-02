@@ -53,7 +53,7 @@ class Test_Table(unittest.TestCase):
         table.add_settings_by_tag('ID', column_name = "ID", column_width = 0.1, format_callback = get_ID_info)
         
         settings = nta.settings
-        unordered_samples = nta.unordered_samples
+        samples, unordered_samples = nta.samples, nta.unordered_samples
         def get_previous_ID_info(previous):
             if previous is None: return ''
             previous_sample = unordered_samples[previous]
@@ -85,10 +85,11 @@ class Test_Table(unittest.TestCase):
                 time_of_above = times.get_value(above)
                 time_since_above = int((time - time_of_above).total_seconds())
             return previous, time_since_previous, time_since_above, f"{data_sums[0][1]:.2E}", f"{data_sums[1][1]:.2E}", data_sums[1][0]
-        results_group = nta.new_results_group('previous', 'time_since_previous', 'time_since_above', 'total_conc', 'total_conc_under_topnm', 'top_nm', callback = callback)
+        calculation = nta.new_calculation(
+            'Previous/time/concentrations', callback,
+            'previous', 'time_since_previous', 'time_since_above', 'total_conc', 'total_conc_under_topnm', 'top_nm')
         
-        samples = nta.samples
-        results = nta.results_for_csv
+        # results = nta.results_for_csv
         # def get_time_info(time, time_since_previous, time_since_above):
         def get_time_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
             text = []
@@ -97,14 +98,18 @@ class Test_Table(unittest.TestCase):
             if time_since_previous is not None:
                 text.append(f"{time_since_previous} since previous")
             return '\n'.join(text)
-        # table.add_time("Time (s)", 0.33)
-        # table.add_concentration("Concentration\n(counts/mL)", 0.3)
-        # table.add_settings_by_tag('time', 'time_since_previous', 'time_since_above', column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
-        table.add_results(results_group, column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
+        calculation.add_format('Time format', format_callback = get_time_info)
 
         def get_conc_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
             return f"Total: {total_conc}\n<{top_nm}nm: {total_conc_under_topnm}"
-        table.add_results(results_group, column_name = "Concentration\n(counts/mL)", column_width = 0.3, format_callback = get_conc_info)
+        calculation.add_format('Concentration format', format_callback = get_conc_info)
+
+        # table.add_time("Time (s)", 0.33)
+        # table.add_concentration("Concentration\n(counts/mL)", 0.3)
+        # table.add_settings_by_tag('time', 'time_since_previous', 'time_since_above', column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
+        
+        table.add_calculation(calculation, 'Time format', column_name = "Time (s)", column_width = 0.33)
+        table.add_calculation(calculation, 'Concentration format', column_name = "Concentration\n(counts/mL)", column_width = 0.3)
 
         def get_sample_name(sample):
             return sample.name
@@ -146,6 +151,8 @@ class Test_Table(unittest.TestCase):
         self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.prepare_tabulation().")
         nta.plot(name = "Final plot")
         self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.plot().")
+        nta.compare()
+        self.assertEqual(num_columns, self.get_num_columns(), "Column count changed after running NTA.compare().")
     def test_persistence_with_peakfinding(self):
         nta = self.nta
         num_columns = self.setup_test_persistence()

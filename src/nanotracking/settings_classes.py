@@ -12,6 +12,61 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from collections import OrderedDict
 
+class Calculation():
+    def __init__(self, name, value_callback, *output_names, units = None, samples = None):
+        '''
+        Defines a calculation with a name, a function determining its value (value_callback), and how to name the function's outputs (output_names).
+        The function value_callback takes a Sample object as its only argument.
+
+        Calculation.refresh() must be called immediately after a new Calculation is initialized.
+        To skip this, use the keyword argument "samples" to specify which samples to use when refreshing.
+        '''
+        self.name = name
+        self.value_callback = value_callback
+        
+        self.output_names = output_names
+        self.output_values = dict()
+        if units is None: units = ''
+        self.units = units
+
+        self.formats = dict()
+
+        if samples is not None:
+            self.refresh(*samples)
+    def add_format(self, name, format_callback = None, format_string = None):
+        assert (format_callback is not None) or (format_string is not None), "Either format_callback or format_string must be specified."
+        assert (format_callback is None) or (format_string is None), "Cannot specify both format_callback and format_string."
+        if format_callback is not None:
+            self.formats[name] = format_callback
+            return
+        self.formats[name] = format_string
+    def apply_format(self, name, sample):
+        values = self.output_values[sample]
+        format_callback = self.formats[name]
+        # TODO: implement or remove format_string
+        return format_callback(*values)
+    def refresh(self, *samples):
+        '''
+        For each sample specified in samples, recalculates output values using Calculation.value_callback.
+        '''
+        for sample in samples:
+            self.output_values[sample] = self.value_callback(sample)
+    def representation_as_settings(self, format_name, samples):
+        '''
+        Returns a Setting object whose subsettings represent the outputs of Calculation.value_callback, including their numerical values.
+        A new Setting object is created each time this runs!
+        '''
+        output_values = self.output_values
+        settings_representation = Setting(f'CALC_{self.name}_FORMAT_{format_name}')
+        for i, output_name in enumerate(self.output_names):
+            output = Setting(output_name, datatype = None)
+            for sample in samples:
+                output.set_value(sample, output_values[sample][i])
+            settings_representation.add_subsetting(output, output_name)
+        # settings_representation.value_callback = self.value_callback
+        settings_representation.format_callback = self.formats[format_name]
+        return settings_representation
+
 class Setting():
     def __init__(self, tag, short_name = None, format_string = None, format_callback = None, value_callback = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
         self.tag = tag
@@ -56,6 +111,9 @@ class Setting():
     def set_value(self, sample: Sample, value, datatype = None):
         if datatype is None:
             datatype = self.datatype
+            if datatype is None:
+                self.sample_values[sample] = value
+                return
         
         if value is None:
             converted_value = None

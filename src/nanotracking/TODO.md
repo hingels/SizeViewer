@@ -1,3 +1,5 @@
+- Test format strings to make sure they work, or remove them
+- In test_Table, fix missing results in CSV
 - Revisit the `particles` and `videos` attributes of Sample
 - Fix bug: time since above isn't blank for the first row
 - Transfer Colab demo into a Runme file to track in git

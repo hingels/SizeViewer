@@ -48,8 +48,8 @@ class Table():
         '''
         if column_number is None:
             column_number = len(self.columns_as_Settings_object.column_widths)
-        get_setting_or_result = self.nta_obj.get_setting_or_result
-        settings = [get_setting_or_result(tag) for tag in tags]
+        get_setting_or_calculation = self.nta_obj.get_setting_or_calculation
+        settings = [get_setting_or_calculation(tag) for tag in tags]
         if format_string is None:
             format_string = '\n'.join([setting.format_string for setting in settings])
         def prepare_setting(setting):
@@ -71,13 +71,10 @@ class Table():
             prepare_setting(setting)
             group.add_subsetting(setting, setting.tag)
         self.add_setting(group)
-    def add_results(self, results_group, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
-        if format_callback is None:
-            group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
-        else:
-            group_suffix = format_callback.__name__
-        new_column = deepcopy(results_group)
-        new_column.set_attributes(tag = results_group.tag + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
+    def add_calculation(self, calculation, format_name, column_number = None, column_name = None, column_width = None):
+        new_column = calculation.representation_as_settings(format_name, self.nta_obj.samples)
+        print("COL:", new_column.tag, [calculation.output_values[sample] for sample in self.nta_obj.samples], [new_column.get_value(sample) for sample in self.nta_obj.samples])
+        new_column.set_attributes(column_number = column_number, column_name = column_name, column_width = column_width)
         self.add_setting(new_column)
     def add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
         '''

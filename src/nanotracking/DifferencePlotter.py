@@ -22,7 +22,7 @@ mpl.rcParams['axes.spines.left'] = False
 mpl.rcParams['axes.spines.right'] = False
 from matplotlib import pyplot as plt, cm
 from .sample_class import Sample
-from .settings_classes import Setting, Settings
+from .settings_classes import Calculation, Setting, Settings
 from .InfoComparison import compare_info
 from .DrawTable import Table
 # from nanotracking import data_handler
@@ -39,7 +39,7 @@ text_shift = 0.05
 @dataclass
 class NeedRefresh:
     settings: set
-    results: set
+    calculations: set
     data: bool
     tabulation: bool
     peaks: bool
@@ -87,10 +87,10 @@ class NTA():
             'cumsum_maxima': os.path.join(output_folder, 'cumsum_maxima'),
             'size_differences': os.path.join(output_folder, 'size_differences')
         }
-        self.results_for_csv = Settings()
+        self.calculations = dict()
         self.sums = []
         self.need_recompute = True
-        self.need_refresh = NeedRefresh(settings = set(), results = set(), data = True, tabulation = True, peaks = False, cumulative = False, difference = False)
+        self.need_refresh = NeedRefresh(settings = set(), calculations = set(), data = True, tabulation = True, peaks = False, cumulative = False, difference = False)
         self.configure_settings()
     def add_table(self, width, margin_minimum_right, margin_left):
         assert self.table is None, "Table already exists; must first call NTA.delete_table()."
@@ -105,22 +105,19 @@ class NTA():
         self.table_enabled = True
     def disable_table(self):
         self.table_enabled = False
-    def get_setting_or_result(self, tag):
+    def get_setting_or_calculation(self, tag):
         output = self.settings.by_tag(tag)
-        if output is None: output = self.results_for_csv.by_tag(tag)
-        assert output is not None, f'Could not find tag "{tag}" in settings or results_for_csv.'
+        if output is None: output = self.calculations[tag]
+        assert output is not None, f'Could not find tag "{tag}" in settings or calculations.'
         return output
 
-    def new_results_group(self, *tags, callback = None):
-        assert callback is not None, "Must specify callback."
-        group = Setting('RESULTS_' + '_'.join(tags), value_callback = callback)
-        for tag in tags:
-            group.add_subsetting(Setting(tag), tag)
-        self.results_for_csv.add_setting(group.tag, group)
+    def new_calculation(self, name, value_callback, *output_names):
+        calculation = Calculation(name, value_callback, *output_names, samples = self.samples)
+        self.calculations[name] = calculation
         need_refresh = self.need_refresh
         need_refresh.tabulation = True
-        need_refresh.results.add(group.tag)
-        return group
+        # need_refresh.calculations.add(calculation)
+        return calculation
             
     def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
         peak_settings = locals(); peak_settings.pop('self')
@@ -301,6 +298,13 @@ class NTA():
             if refresh_data or refresh_difference:
                 overall_max = max(sizes.max(), overall_max)
                 overall_min = min(sizes.min(), overall_min)
+            for setting in tuple(need_refresh.settings):
+                value = setting.value_callback(sample)
+                setting.set_value(sample, value)
+                need_refresh.settings.remove(setting)
+            for calculation in tuple(need_refresh.calculations):
+                calculation.refresh(sample)
+                need_refresh.calculations.remove(calculation)
             previous_sizes = sizes
         
         tmp_filenames = self.tmp_filenames
@@ -338,7 +342,6 @@ class NTA():
             else:
                 treatments_waits_columnIndex = -1
         
-        results_for_csv = self.results_for_csv
         def generate_rows():
             column_quantities = dict()
             def number_of_subtags(tag):
@@ -422,20 +425,18 @@ class NTA():
                                 row.append(group.format_callback(*(setting.get_value(sample) for setting in grouped_settings)))
                                 continue
                             row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
-                        elif column[0].tag.startswith('RESULTS'):
+                        elif column[0].tag.startswith('CALC'):
                             group = column[0]
+                            # grouped_settings, values = group.subsettings.values(), group.get_value(sample) # These line up; will use zip below
                             grouped_settings = group.subsettings.values()
-                            values = group.value_callback(sample)
+                            values = [subsetting.get_value(sample) for subsetting in grouped_settings]
                             if group.format_callback is not None:
                                 row.append(group.format_callback(*values))
                                 continue
                             row.append(group.format_string.format(**{setting.tag: value for setting, value in zip(grouped_settings, values)}))
                         else:
                             setting = column[0]
-                            if setting.value_callback is None:
-                                value = setting.get_value(sample)
-                            else:
-                                value = setting.value_callback(sample)
+                            value = setting.get_value(sample)
                             if setting.format_callback is None:
                                 row.append(setting.format_string.format(**{setting.tag: value}))
                             else:
@@ -457,7 +458,7 @@ class NTA():
     def compare(self):
         assert self.need_recompute == False, "Must run NTA.compute() first."
         assert self.need_refresh.tabulation == False, "Must run NTA.prepare_tabulation() first."
-        compare_info(self.settings, self.samples, self.results_for_csv, self.output_folder)
+        compare_info(self.settings, self.samples, self.calculations, self.output_folder)
     def load_tempfile(self, key):
         filename = self.tmp_filenames[key]+'.npy'
         try:
