@@ -125,8 +125,8 @@ class NTA():
         assert output is not None, f'Could not find tag "{tag}" in settings or calculations.'
         return output
 
-    def new_calculation(self, name, value_callback, *output_names):
-        calculation = Calculation(name, value_callback, *output_names, samples = self.samples)
+    def new_calculation(self, name, value_function, *output_names):
+        calculation = Calculation(name, value_function, *output_names, samples = self.samples)
         self.calculations[name] = calculation
         need_refresh = self.need_refresh
         need_refresh.tabulation = True
@@ -299,7 +299,7 @@ class NTA():
                 overall_max = max(counts.max(), overall_max)
                 overall_min = min(counts.min(), overall_min)
             for setting in tuple(need_refresh.settings):
-                value = setting.value_callback(sample)
+                value = setting.value_function(sample)
                 setting.set_value(sample, value)
                 need_refresh.settings.remove(setting)
             for calculation in tuple(need_refresh.calculations):
@@ -417,25 +417,25 @@ class NTA():
                     if column[0].tag.startswith('COLUMN'):
                         group = column[0]
                         grouped_settings = group.subsettings.values()
-                        if group.format_callback is not None:
-                            row.append(group.format_callback(*(setting.get_value(sample) for setting in grouped_settings)))
+                        if group.format_function is not None:
+                            row.append(group.format_function(*(setting.get_value(sample) for setting in grouped_settings)))
                             continue
                         row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
                     elif column[0].tag.startswith('CALC'):
                         group = column[0]
                         grouped_settings = group.subsettings.values()
                         values = [subsetting.get_value(sample) for subsetting in grouped_settings]
-                        if group.format_callback is not None:
-                            row.append(group.format_callback(*values))
+                        if group.format_function is not None:
+                            row.append(group.format_function(*values))
                             continue
                         row.append(group.format_string.format(**{setting.tag: value for setting, value in zip(grouped_settings, values)}))
                     else:
                         setting = column[0]
                         value = setting.get_value(sample)
-                        if setting.format_callback is None:
+                        if setting.format_function is None:
                             row.append(setting.format_string.format(**{setting.tag: value}))
                         else:
-                            row.append(setting.format_callback(value))
+                            row.append(setting.format_function(value))
                 
                 row.append("")
                 yield row

@@ -9,6 +9,7 @@
   - Rename format_callback to format_function? May be more accurate
   - Add assertion that each column_number corresponds to exactly one Setting object (which may have subsettings to include multiple rows of information)
   - Add assertion that Setting tag has no spaces in Setting.__init__()
+    - Is this necessary?
 - Add a Plot class to more easily distinguish between plotting functionality and other features. Currently too many plot-related methods in NTA class; easy to get lost
 - Validate concentration values displayed on the table. Are we using the correct volume in the calculation?
 - Fix broken find_truncation_index; plot currently shows just 1 bar, under 16 nm.

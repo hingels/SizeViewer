@@ -32,7 +32,7 @@ class Table():
         if setting.column_number is None:
             setting.column_number = len(settings.column_widths)
         settings.add_setting(setting.tag, setting)
-    def add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_callback = None):
+    def add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format_string = None, format_function = None):
         '''
         Adds multiple Setting objects to the table.
         Example use case: specify column_number to group all specified settings into one column.
@@ -40,11 +40,11 @@ class Table():
         If column_number is not given, the next available column will be used.
         Note: the column_number values of the specified Setting objects will be overwritten!
         
-        If neither format_string nor format_callback are given, then for each cell in the column, the settings' individual format_strings will be used on separate lines.
+        If neither format_string nor format_function are given, then for each cell in the column, the settings' individual format_strings will be used on separate lines.
         To use format_string, reference settings' values using their tags in curly braces: for example, format_string = "Red has power {RedLaserPower}."
-        To use format_callback, define a function that accepts settings' values as arguments and returns a formatted (value-containing) string.
+        To use format_function, define a function that accepts settings' values as arguments and returns a formatted (value-containing) string.
 
-        If format_callback is given, it will be used instead of format_string.
+        If format_function is given, it will be used instead of format_string.
         '''
         if column_number is None:
             column_number = len(self.columns_as_Settings_object.column_widths)
@@ -59,14 +59,14 @@ class Table():
         if len(settings) == 1:
             setting = settings[0]
             prepare_setting(setting)
-            setting.set_attributes(format_string = format_string, format_callback = format_callback)
+            setting.set_attributes(format_string = format_string, format_function = format_function)
             self.add_setting(setting)
             return
-        if format_callback is None:
-            group_suffix = format_string  # Allows multiple different format_callbacks or format_strings to be used on the same group, without counting as the same group (which would cause an error)
+        if format_function is None:
+            group_suffix = format_string  # Allows multiple different format_functions or format_strings to be used on the same group, without counting as the same group (which would cause an error)
         else:
-            group_suffix = format_callback.__name__
-        group = Setting('COLUMN_' + '_'.join(tags) + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
+            group_suffix = format_function.__name__
+        group = Setting('COLUMN_' + '_'.join(tags) + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_function = format_function)
         for setting in settings:
             prepare_setting(setting)
             group.add_subsetting(setting.tag, setting)

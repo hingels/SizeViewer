@@ -13,41 +13,41 @@ from datetime import datetime, timedelta
 from collections import OrderedDict
 
 class Calculation():
-    def __init__(self, name, value_callback, *output_names, units = None, samples = None):
+    def __init__(self, name, value_function, *output_names, units = None, samples = None):
         '''
-        Defines a calculation with a name, a function determining its value (value_callback), and how to name the function's outputs (output_names).
-        The function value_callback takes a Sample object as its only argument.
+        Defines a calculation with a name, a function determining its value (value_function), and how to name the function's outputs (output_names).
+        The function value_function takes a Sample object as its only argument.
 
         Calculation.refresh() must be called immediately after a new Calculation is initialized.
         To skip this, use the keyword argument "samples" to specify which samples to use when refreshing.
         '''
         if units is None: units = ''
-        self.name, self.value_callback = name, value_callback
+        self.name, self.value_function = name, value_function
         self.output_names, self.output_values = output_names, dict()
         self.units, self.formats = units, dict()
         if samples is not None:
             self.refresh(*samples)
-    def add_format(self, name, format_callback = None, format_string = None):
-        assert (format_callback is not None) or (format_string is not None), "Either format_callback or format_string must be specified."
-        assert (format_callback is None) or (format_string is None), "Cannot specify both format_callback and format_string."
-        if format_callback is not None:
-            self.formats[name] = format_callback
+    def add_format(self, name, format_function = None, format_string = None):
+        assert (format_function is not None) or (format_string is not None), "Either format_function or format_string must be specified."
+        assert (format_function is None) or (format_string is None), "Cannot specify both format_function and format_string."
+        if format_function is not None:
+            self.formats[name] = format_function
             return
         self.formats[name] = format_string
     def apply_format(self, name, sample):
         values = self.output_values[sample]
-        format_callback = self.formats[name]
+        format_function = self.formats[name]
         # TODO: implement or remove format_string
-        return format_callback(*values)
+        return format_function(*values)
     def refresh(self, *samples):
         '''
-        For each sample specified in samples, recalculates output values using Calculation.value_callback.
+        For each sample specified in samples, recalculates output values using Calculation.value_function.
         '''
         for sample in samples:
-            self.output_values[sample] = self.value_callback(sample)
+            self.output_values[sample] = self.value_function(sample)
     def representation_as_setting(self, format_name, samples):
         '''
-        Returns a Setting object whose subsettings represent the outputs of Calculation.value_callback, including their numerical values.
+        Returns a Setting object whose subsettings represent the outputs of Calculation.value_function, including their numerical values.
         A new Setting object is created each time this runs!
         '''
         output_values = self.output_values
@@ -57,19 +57,19 @@ class Calculation():
             for sample in samples:
                 output.set_value(sample, output_values[sample][i])
             settings_representation.add_subsetting(output_name, output)
-        # settings_representation.value_callback = self.value_callback
-        settings_representation.format_callback = self.formats[format_name]
+        # settings_representation.value_function = self.value_function
+        settings_representation.format_function = self.formats[format_name]
         return settings_representation
 
 class Setting():
-    def __init__(self, tag, short_name = None, format_string = None, format_callback = None, value_callback = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
+    def __init__(self, tag, short_name = None, format_string = None, format_function = None, value_function = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
         if name is None: name = tag
         if short_name is None: short_name = name
         if format_string is None:
             format_string = show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
         self.tag, self.short_name = tag, short_name
-        self.format_string, self.format_callback = format_string, format_callback
-        self.value_callback, self.datatype = value_callback, datatype
+        self.format_string, self.format_function = format_string, format_function
+        self.value_function, self.datatype = value_function, datatype
         self.name, self.show_name = name, show_name
         self.units, self.show_unit = units, show_unit
         self.column_number, self.column_name, self.column_width = column_number, column_name, column_width
