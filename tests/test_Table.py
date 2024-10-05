@@ -1,16 +1,18 @@
 import unittest
 from src.nanotracking import DifferencePlotter
 from src.nanotracking import settings_classes
+import numpy as np
 
 class Test_Table(unittest.TestCase):
-    filenames = ["1", "1.2", "1.3"]
+    filenames = ["1-1e5 150nm Nanosphere", "1-1e5 150nm Nanosphere 2", "1-1e5 150nm Nanosphere 32ms", "1-1e5 150nm Nanosphere diff detection setting"]
     specifiers = "All measurements"
     def setUp(self):
         filenames = self.filenames
         nta = DifferencePlotter.NTA(
             datafolder = "tests/Test data",
             output_folder = f"tests/Test output/{self.specifiers}/{self.id()}",
-            filenames = filenames
+            filenames = filenames,
+            truncation_size = 400 # nanometers
         )
         nta.compute()
         self.assertEqual(nta.num_of_plots, len(filenames), "Number of filenames is not equal to number of plots.")
@@ -26,9 +28,6 @@ class Test_Table(unittest.TestCase):
         nta = self.nta
         table = self.table
         table.add_treatments_and_waits("Treatment\n{treatment_number}\n(µM)", 0.2, "4°C\nwait\n{wait_number}\n(h)", 0.07)
-        # names = ["Filter\ncut-on\n(nm)", "Power\n(mW)", "Exposure,\ngain", "Detection\nsetting", "Video sec\nx quantity", "Stir sec\nx RPM", "ID", "ID of\nprevious"]
-        # widths = [0.1, 0.19, 0.14, 0.19, 0.16, 0.12, 0.1, 0.13]
-        # assert len(names) == len(widths), f"{len(names)=} does not equal {len(widths)=}"
         table.add_settings_by_tag('filter', column_name = "Filter\ncut-on\n(nm)", column_width = 0.1)
         table.add_settings_by_tag('RedLaserPower', 'GreenLaserPower', 'BlueLaserPower', column_name = "Power\n(mW)", column_width = 0.19)
         table.add_settings_by_tag('Exposure', column_name = "Exposure,\ngain", column_width = 0.14)
@@ -59,15 +58,24 @@ class Test_Table(unittest.TestCase):
             previous_sample = unordered_samples[previous]
             ID_of_previous = settings.by_tag('ID').get_value(previous_sample)
             return '\n'.join((ID_of_previous[0:4], ID_of_previous[4:8], ID_of_previous[8:12]))
-        # previous_ID_setting = settings_classes.Setting('previous_ID_setting', column_name = "ID of\nprevious", column_width = 0.13, format_callback = get_previous_ID_info)
-        # nta.settings.add_setting(previous_ID_setting.tag, previous_ID_setting)
         table.add_settings_by_tag('previous', column_name = "ID of\nprevious", column_width = 0.13, format_callback = get_previous_ID_info)
 
         times = settings.by_tag('time')
-        sums = nta.sums
         def callback(sample):
+            truncation_size = 200
+            sizes = nta.sizes(sample = sample)
+            truncated_sizes = nta.sizes(sample = sample, truncation_size = truncation_size)
+
+            bin_width = nta.bin_width
+            truncated_bins = nta.bins(sample = sample, truncation_size = truncation_size) # Bottoms of bins
+            truncated_tops_of_bins = nta.bin_width + truncated_bins
+            top_nm = max(truncated_tops_of_bins)
+            if top_nm.is_integer():
+                top_nm = int(top_nm)
+            total_conc = np.sum(sizes)*bin_width
+            total_conc_under_topnm = np.sum(truncated_sizes*bin_width)
+            
             sample_index = sample.index
-            data_sums = sums[sample_index]
             time = times.get_value(sample) # times accessed via closure
             time_since_previous = None
             previous = settings.by_tag('previous').get_value(sample)
@@ -84,13 +92,11 @@ class Test_Table(unittest.TestCase):
             if above is not None:
                 time_of_above = times.get_value(above)
                 time_since_above = int((time - time_of_above).total_seconds())
-            return previous, time_since_previous, time_since_above, f"{data_sums[0][1]:.2E}", f"{data_sums[1][1]:.2E}", data_sums[1][0]
+            return previous, time_since_previous, time_since_above, f"{total_conc:.2E}", f"{total_conc_under_topnm:.2E}", top_nm
         calculation = nta.new_calculation(
             'Previous/time/concentrations', callback,
             'previous', 'time_since_previous', 'time_since_above', 'total_conc', 'total_conc_under_topnm', 'top_nm')
         
-        # results = nta.results_for_csv
-        # def get_time_info(time, time_since_previous, time_since_above):
         def get_time_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
             text = []
             if time_since_above is not None:
@@ -103,10 +109,6 @@ class Test_Table(unittest.TestCase):
         def get_conc_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
             return f"Total: {total_conc}\n<{top_nm}nm: {total_conc_under_topnm}"
         calculation.add_format('Concentration format', format_callback = get_conc_info)
-
-        # table.add_time("Time (s)", 0.33)
-        # table.add_concentration("Concentration\n(counts/mL)", 0.3)
-        # table.add_settings_by_tag('time', 'time_since_previous', 'time_since_above', column_name = "Time (s)", column_width = 0.33, format_callback = get_time_info)
         
         table.add_calculation(calculation, 'Time format', column_name = "Time (s)", column_width = 0.33)
         table.add_calculation(calculation, 'Concentration format', column_name = "Concentration\n(counts/mL)", column_width = 0.3)
@@ -158,7 +160,9 @@ class Test_Table(unittest.TestCase):
         num_columns = self.setup_test_persistence()
         nta.enable_peak_detection(
             kernel_size = 30,
+            # kernel_size = 10,
             kernel2_size = 20,
+            # kernel2_size = 10,
             kernel_std_in_bins = 4,
             second_derivative_threshold = -30,
             maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'},
@@ -180,10 +184,10 @@ class Test_Table(unittest.TestCase):
         self.finish_test_persistence(num_columns)
 
 class Test_Table_OneMeasurement(Test_Table):
-    filenames = ["1"]
+    filenames = ["1-1e5 150nm Nanosphere"]
     specifiers = "One measurement"
 class Test_Table_TwoMeasurements(Test_Table):
-    filenames = ["1", "1.2"]
+    filenames = ["1-1e5 150nm Nanosphere", "1-1e5 150nm Nanosphere 2"]
     specifiers = "Two measurements"
 
 if __name__ == '__main__':

@@ -1,8 +1,20 @@
+- Instead of (or in addition to) Calculation name, show format name in CSV files
+- Make all info.md settings user-defined, such that the user chooses the settings' names, how many there are, how they will be displayed, etc.
+- Add a simple ViewSizer 3000 settings object that maps setting names and values from .xml to Setting objects
+- Rename "sizes" to "counts" and possibly "bins" to "sizes"
+- Condense attribute initialization (self.x = x for some attribute x) into one line in Setting.__init__() and other places
+- Add a Plot class to more easily distinguish between plotting functionality and other features. Currently too many plot-related methods in NTA class; easy to get lost
+- Validate concentration values displayed on the table. Are we using the correct volume in the calculation?
+- Fix broken find_truncation_index; plot currently shows just 1 bar, under 16 nm.
+- Rename Calculation to Column
+  - Use it for both calculations and groups of Setting objects
+- Replace code specific to format strings with a simple "format callback maker," e.g. `format_callback = lambda *args: format_string.format(…………)`
+- Save Calculation values in .npy files
 - Test format strings to make sure they work, or remove them
 - In test_Table, fix missing results in CSV
 - Revisit the `particles` and `videos` attributes of Sample
 - Fix bug: time since above isn't blank for the first row
-- Transfer Colab demo into a Runme file to track in git
+**- Transfer Colab demo into a Runme file to track in git**
 - Add ability to save user-specified calculations to NumPy files
 - Add auto-refresh option
 - Add file name templates to demo

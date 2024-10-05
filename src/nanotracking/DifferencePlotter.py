@@ -28,8 +28,7 @@ from .DrawTable import Table
 # from nanotracking import data_handler
 
 volume = 2.3E-06
-x_lim = 400
-num_data_points = 400
+# x_lim = 400
 prefix = 'ConstantBinsTable_'
 prefix2 = 'Videos_'
 suffix = '.dat'
@@ -47,14 +46,16 @@ class NeedRefresh:
     difference: bool
 
 class NTA():
-    def __init__(self, datafolder, output_folder, filenames):
+    def __init__(self, datafolder, output_folder, filenames, truncation_size):
         self.datafolder, self.output_folder, self.filenames = datafolder, output_folder, filenames
         os.makedirs(output_folder, exist_ok = True)
         self.table, self.peak_settings = None, None
         self.table_enabled, self.cumulative_enabled, self.difference_enabled = False, False, False
         def generate_samples():
             for folder in os.listdir(datafolder):
-                sample = Sample(os.path.join(datafolder, folder), prefix, suffix, videos_file_prefix = prefix2)
+                folder_path = os.path.join(datafolder, folder)
+                if os.path.isfile(folder_path): continue
+                sample = Sample(folder_path, prefix, suffix, videos_file_prefix = prefix2)
                 if sample.filename not in filenames: continue
                 yield sample.filename, sample
         unordered_samples = dict(generate_samples())
@@ -63,6 +64,8 @@ class NTA():
             sample = unordered_samples[name]
             sample.index = i
             samples.append(sample)
+        self.samples = samples
+        self.truncation_index = self.find_truncation_index(truncation_size)
         samples_setting = Setting('sample', datatype = Sample)
         for sample in samples:
             samples_setting.set_value(sample, sample)
@@ -73,9 +76,10 @@ class NTA():
         height = min(np.floor(65536/resolution), height)
         self.figsize = (width, height)
         self.colors = cm.plasma(np.linspace(0, 1, num_of_plots))
-        self.unordered_samples, self.samples, self.num_of_plots = unordered_samples, samples, num_of_plots
+        self.unordered_samples, self.num_of_plots = unordered_samples, num_of_plots
         self.overall_min, self.overall_max = None, None
         self.maxima, self.rejected_maxima = None, None
+        self.bin_width = None
         self.settings = None
         self.tmp_filenames = {
             'bins': os.path.join(output_folder, 'bins'),
@@ -88,10 +92,20 @@ class NTA():
             'size_differences': os.path.join(output_folder, 'size_differences')
         }
         self.calculations = dict()
-        self.sums = []
         self.need_recompute = True
         self.need_refresh = NeedRefresh(settings = set(), calculations = set(), data = True, tabulation = True, peaks = False, cumulative = False, difference = False)
         self.configure_settings()
+    def find_truncation_index(self, truncation_size):
+        '''
+        Given a maximum particle size (truncation_size), finds the lowest index of the array returned by NTA.data_of_sample(sample, truncated = False) such that all sizes are below truncation_size.
+        This index doesn't apply to NTA.bins(), NTA.sizes(), etc.!
+        '''
+        truncation_index = -1
+        for sample in self.samples:
+            sample_data = self.data_of_sample(sample, truncated = False)
+            _truncation_index = np.argmax(sample_data['UpperBinDiameter_[nm]'] > truncation_size)
+            truncation_index = max(truncation_index, _truncation_index)
+        return truncation_index
     def add_table(self, width, margin_minimum_right, margin_left):
         assert self.table is None, "Table already exists; must first call NTA.delete_table()."
         table = Table(self, width, margin_minimum_right, margin_left)
@@ -185,15 +199,24 @@ class NTA():
     #     """
     #     need_refresh = self.need_refresh
 
-    def data_of_sample(self, sample):
+    def data_of_sample(self, sample, truncated = True, truncation_size = None):
         """
         Get the size distribution of a sample, using either its name (a string) or the Sample object itself.
         Returns a Pandas DataFrame.
+        If truncated is True, only data with sizes below truncation_size will be returned.
+        If truncation_size is None, NTA.truncation_size will be used.
         """
         if type(sample) is not Sample:
             assert type(sample) is str, "Argument of data_of_sample must be of type Sample or string."
             sample = self.unordered_samples[sample]
-        return pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
+        all_data = pd.read_csv(sample.dat, sep = '\t ', engine = 'python')
+        if truncated:
+            if truncation_size is None:
+                truncation_index = self.truncation_index
+            else:
+                truncation_index = self.find_truncation_index(truncation_size)
+            return all_data.iloc[:truncation_index, :]
+        return all_data
     def compute(self, prep_tabulation = True):
         need_refresh = self.need_refresh
         def vstack(arrays):
@@ -219,26 +242,20 @@ class NTA():
 
         overall_min, overall_max = 0, 0
         previous_sizes = None
-        sums = self.sums
         last_bins = None
         if refresh_data:
             all_bins, all_sizes = [], []
         else:
             all_bins, all_sizes = self.bins(), self.sizes()
-        fulldata_size_sums = []
+            width = self.bin_width
         data_of_sample = self.data_of_sample
         for i, sample in enumerate(self.samples):
             if not refresh_data:
                 bins, sizes = all_bins[i], all_sizes[i]
-                width = bins[1] - bins[0]
             else:
-                full_data = data_of_sample(sample)
-                data = full_data.iloc[:num_data_points, :]
+                data = data_of_sample(sample, truncated = True)
                 bins, sizes = data['/LowerBinDiameter_[nm]'], data['PSD_corrected_[counts/mL/nm]']
-                
-                top_nm = max(data['UpperBinDiameter_[nm]'])
-                if top_nm.is_integer():
-                    top_nm = int(top_nm)
+                width = bins[1] - bins[0]
                 
                 if last_bins is not None:
                     assert np.all(bins == last_bins) == True, 'Unequal sequence of bins between samples detected!'
@@ -250,16 +267,8 @@ class NTA():
                 #     sample_filename = sample.filename,
                 #     outputs_path = self.output_folder,
                 #     num_data_points = num_data_points)
-                width = bins[1] - bins[0]
-
-                fulldata_size_sum = np.sum(full_data['PSD_corrected_[counts/mL/nm]'])
                 all_bins.append(bins)
                 all_sizes.append(sizes)
-                fulldata_size_sums.append(fulldata_size_sum)
-                sums.append((
-                    ('All data', fulldata_size_sum*width),
-                    (top_nm, np.sum(sizes*width))
-                ))
 
             # videos = sample.videos
             # all_histograms = np.array([np.histogram(video, bins = bins)[0] for video in videos])
@@ -273,6 +282,8 @@ class NTA():
             # avg_histograms.append(avg_histograms)
 
             if refresh_peaks:
+                assert len(lowpass_filter) <= len(sizes), f"kernel_size={len(lowpass_filter)} is too big, given {len(sizes)=}."
+                assert kernel2_size <= len(sizes), f"{kernel2_size=} is too big, given {len(sizes)=}."
                 bin_centers = bins + width/2
                 filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
                 maxima_candidates, = argrelextrema(filtered, np.greater)
@@ -311,8 +322,8 @@ class NTA():
         if refresh_data:
             np.save(tmp_filenames['bins'], vstack(all_bins))
             np.save(tmp_filenames['sizes'], vstack(all_sizes))
-            np.save(tmp_filenames['fulldata_size_sums'], fulldata_size_sums)
             self.overall_min, self.overall_max = overall_min, overall_max
+            self.bin_width = last_bins[1] - last_bins[0]
         # np.save(tmp_filenames['total_stds'], vstack(total_stds))
         # np.save(tmp_filenames['avg_histograms'], vstack(avg_histograms))
         if refresh_peaks:
@@ -466,10 +477,38 @@ class NTA():
         except OSError:
             raise Exception(f"Couldn't find {filename}.")
         return data
-    def bins(self):
-        return self.load_tempfile('bins')
-    def sizes(self):
-        return self.load_tempfile('sizes')
+    def bins(self, sample = None, truncation_size = None, lower = True, middle = False, upper = False):
+        assert (lower + middle + upper) == 1, "Must set either lower, middle, or upper to True, but not more than one."
+        
+        if truncation_size is not None:
+            assert sample is not None, "Must specify a sample when using truncation_size."
+            upper_bins = self.bins(sample = sample, truncation_size = None, lower = False, upper = True)
+            truncation_index = np.argmax(upper_bins > truncation_size)
+        
+        all_bins = self.load_tempfile('bins')
+        all_bins += (0.5*middle + 1*upper) * self.bin_width
+        if sample is not None:
+            assert sample.index is not None, "The provided Sample object has no index."
+            sample_bins = all_bins[sample.index]
+            if truncation_size is not None:
+                return sample_bins[:truncation_index]
+            return sample_bins
+        return all_bins
+    def sizes(self, sample = None, truncation_size = None):
+        all_sizes = self.load_tempfile('sizes')
+        
+        if truncation_size is not None:
+            assert sample is not None, "Must specify a sample when using truncation_size."
+            upper_bins = self.bins(sample = sample, truncation_size = None, lower = False, upper = True)
+            truncation_index = np.argmax(upper_bins > truncation_size)
+        
+        if sample is not None:
+            assert sample.index is not None, "The provided Sample object has no index."
+            sample_sizes = all_sizes[sample.index]
+            if truncation_size is not None:
+                return sample_sizes[:truncation_index]
+            return sample_sizes
+        return all_sizes
     def plot(self, grid_color = '0.8', name = 'Ridgeline plot'):
         assert self.need_recompute == False, "Must run NTA.compute() first."
         num_of_plots, samples, colors, table, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
@@ -536,7 +575,7 @@ class NTA():
             errorbars = np.array(list(zip(total_std, [0]*len(total_std)))).T
             plt.errorbar(bin_centers[:-1], avg_histogram, yerr = errorbars, elinewidth = 1, linestyle = '', marker = '.', ms = 1, alpha = 0.5, color = 'black')            
             
-            plt.xlim(0, x_lim)
+            # plt.xlim(0, x_lim)
             plt.ylim(overall_min, overall_max)
             ax.patch.set_alpha(0)
                 

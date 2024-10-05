@@ -7,7 +7,8 @@ class Test_Basics(unittest.TestCase):
         cls.nta = DifferencePlotter.NTA(
             datafolder = "tests/Test data",
             output_folder = "tests/Test output/Basics",
-            filenames = ["1"]
+            filenames = ["1-1e5 150nm Nanosphere", "1-1e5 150nm Nanosphere 2", "1-1e5 150nm Nanosphere 32ms", "1-1e5 150nm Nanosphere diff detection setting"],
+            truncation_size = 400 # nanometers
         )
     def test_compute(self):
         self.nta.compute()
