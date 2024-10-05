@@ -1,8 +1,17 @@
+- Finish refresh functionality
+- Move enable/disable_peak_detection, enable/disable_cumulative, and enable/disable_difference into new `nanotracking.analysis`
+  - Make these user-defined, too?
 - Instead of (or in addition to) Calculation name, show format name in CSV files
 - Make all info.md settings user-defined, such that the user chooses the settings' names, how many there are, how they will be displayed, etc.
 - Add a simple ViewSizer 3000 settings object that maps setting names and values from .xml to Setting objects
-- Rename "sizes" to "counts" and possibly "bins" to "sizes"
-- Condense attribute initialization (self.x = x for some attribute x) into one line in Setting.__init__() and other places
+- Housekeeping
+  - Rename "sizes" to "counts" and possibly "bins" to "sizes"
+  - Condense attribute initialization (self.x = x for some attribute x) into one line in Setting.__init__() and other places
+  - Make diagram(s) of the codebase, laying out how data structures are handled, operated on, etc.
+  - Rename format_callback to format_function? May be more accurate
+  - Add assertion that each column_number corresponds to exactly one Setting object (which may have subsettings to include multiple rows of information)
+  - Add assertion that Setting tag has no spaces in Setting.__init__()
+  - Fix parity of Setting.add_subsetting() arguments relative to those of Settings.add_setting()
 - Add a Plot class to more easily distinguish between plotting functionality and other features. Currently too many plot-related methods in NTA class; easy to get lost
 - Validate concentration values displayed on the table. Are we using the correct volume in the calculation?
 - Fix broken find_truncation_index; plot currently shows just 1 bar, under 16 nm.
@@ -37,30 +46,11 @@
 - Set up benchmarking, e.g. Airspeed Velocity
 - Use more efficient debugging, e.g. `pdb`
   - Learn concepts and practices of proper debugging
-- Switch from `setuptools` to `meson`
-- Housekeeping branch
-  - Update TODO.md
-  - Remove commented-out code
-  - Simplify and divide (NOT abstract away) code organization to stop getting lost in long files, and to easily trace what's happening.
-    - Need this to accelerate development; lots of time wasted in confusion. Also want it to be open for new contributors
-  - Make diagram(s) of the codebase, laying out how data structures are handled, operated on, etc.
 - Make a template JSON file, info.json, containing all possible options the user can specify for a "sample"/"measurement." Keep this in src folder for easy reference, and programmatically copy it to describe each case.
   - If info.md is kept, fix bug: breaks when info.md has spaces around equal signs
-- Seems weird for settings to be objects instead of attributes. Is this reasonably easy to change?
-  - Want everything to be simple and intuitive
 - Add experimental unit in test_Table.py
 - Add default/template format/value callbacks, e.g. for time (nta.table_add_time)
 - Add Setting objects as attributes (setattr) of Settings object
-- Rename format_callback to format_function? May be more accurate
-- Add assertion that each column_number corresponds to exactly one Setting object (which may have subsettings to include multiple rows of information)
-- Add assertion that Setting tag has no spaces in Setting.__init__()
-- Fix parity of Setting.add_subsetting() arguments relative to those of Settings.add_setting()
-- Add setting tags to table_add_column
-- Possibly change columns list into list of Setting objects
-- Rename table_add_column to table_add_setting
-- Rename table_settings to distinguish it from Settings
-- Add if statements around results_for_csv.add_subsetting; may not want these enabled
-- Add more efficient debugging/testing
 - Add option to plot .dat files other than those whose names start with "ConstantBinsTable_"
 - When animating particle trajectories, plot ViewSizer's trajectories all in one color, but have the shading darken when paths for each particle cross. Then in another color, add trajectories calculated by TrackPy for validation
 - Add docstrings
