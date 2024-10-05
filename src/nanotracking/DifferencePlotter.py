@@ -133,14 +133,14 @@ class NTA():
         # need_refresh.calculations.add(calculation)
         return calculation
             
-    def enable_peak_detection(self, kernel_size, kernel2_size, kernel_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
+    def enable_peak_detection(self, gaussian_width, moving_avg_width, gaussian_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
         peak_settings = locals(); peak_settings.pop('self')
-        x = np.linspace(0, kernel_size, kernel_size)
-        gaussian = np.exp(-np.power((x - kernel_size/2)/kernel_std_in_bins, 2)/2)/(kernel_std_in_bins * np.sqrt(2*np.pi))
+        x = np.linspace(0, gaussian_width, gaussian_width)
+        gaussian = np.exp(-np.power((x - gaussian_width/2)/gaussian_std_in_bins, 2)/2)/(gaussian_std_in_bins * np.sqrt(2*np.pi))
         peak_settings['lowpass_filter'] = gaussian / gaussian.sum()
-        peak_settings['filter_description'] = f"Black lines indicate Gaussian smoothing (a low-pass filter) with $\sigma = {kernel_std_in_bins}$ bins and convolution kernel of size {kernel_size} bins."
+        peak_settings['filter_description'] = f"Black lines indicate Gaussian smoothing (a low-pass filter) with $\sigma = {gaussian_std_in_bins}$ bins and convolution kernel of width {gaussian_width} bins."
         peak_settings['maxima_candidate_description'] = f": Candidate peaks after smoothing, selected using argrelextrema in SciPy {scipy.__version__}."
-        peak_settings['maxima_description'] = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of size {kernel2_size} bins."
+        peak_settings['maxima_description'] = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of width {moving_avg_width} bins."
         self.peak_settings = peak_settings
         self.need_recompute = True
         self.need_refresh.tabulation = True
@@ -229,7 +229,7 @@ class NTA():
         peaks_enabled = (peak_settings is not None)
         refresh_peaks = (peaks_enabled and need_refresh.peaks)
         if refresh_peaks:
-            lowpass_filter, kernel2_size, second_derivative_threshold = peak_settings['lowpass_filter'], peak_settings['kernel2_size'], peak_settings['second_derivative_threshold']
+            lowpass_filter, moving_avg_width, second_derivative_threshold = peak_settings['lowpass_filter'], peak_settings['moving_avg_width'], peak_settings['second_derivative_threshold']
             all_filtered, all_maxima, all_rejected  = [], [], []
         refresh_cumulative = (self.cumulative_enabled and need_refresh.cumulative)
         if refresh_cumulative:
@@ -282,12 +282,12 @@ class NTA():
             # avg_histograms.append(avg_histograms)
 
             if refresh_peaks:
-                assert len(lowpass_filter) <= len(counts), f"kernel_size={len(lowpass_filter)} is too big, given {len(counts)=}."
-                assert kernel2_size <= len(counts), f"{kernel2_size=} is too big, given {len(counts)=}."
+                assert len(lowpass_filter) <= len(counts), f"gaussian_width={len(lowpass_filter)} is too big, given {len(counts)=}."
+                assert moving_avg_width <= len(counts), f"{moving_avg_width=} is too big, given {len(counts)=}."
                 bin_centers = sizes + size_binwidth/2
                 filtered = np.convolve(counts, lowpass_filter, mode = 'same')
                 maxima_candidates, = argrelextrema(filtered, np.greater)
-                twice_filtered = np.convolve(filtered, [1/kernel2_size]*kernel2_size, mode = 'same')
+                twice_filtered = np.convolve(filtered, [1/moving_avg_width]*moving_avg_width, mode = 'same')
                 derivative = np.gradient(twice_filtered, bin_centers)
                 second_derivative = np.gradient(derivative, bin_centers)
                 second_deriv_negative, = np.where(second_derivative < second_derivative_threshold)
