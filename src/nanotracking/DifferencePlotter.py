@@ -83,13 +83,13 @@ class NTA():
         self.settings = None
         self.tmp_filenames = {
             'bins': os.path.join(output_folder, 'bins'),
-            'sizes': os.path.join(output_folder, 'sizes'),
-            'filtered_sizes': os.path.join(output_folder, 'filtered_sizes'),
+            'counts': os.path.join(output_folder, 'counts'),
+            'filtered_counts': os.path.join(output_folder, 'filtered_counts'),
             'top_nm': os.path.join(output_folder, 'top_nm'),
-            'fulldata_size_sums': os.path.join(output_folder, 'fulldata_size_sums'),
+            'fulldata_count_sums': os.path.join(output_folder, 'fulldata_count_sums'),
             'cumulative_sums': os.path.join(output_folder, 'cumulative_sums'),
             'cumsum_maxima': os.path.join(output_folder, 'cumsum_maxima'),
-            'size_differences': os.path.join(output_folder, 'size_differences')
+            'count_differences': os.path.join(output_folder, 'count_differences')
         }
         self.calculations = dict()
         self.need_recompute = True
@@ -98,7 +98,7 @@ class NTA():
     def find_truncation_index(self, truncation_size):
         '''
         Given a maximum particle size (truncation_size), finds the lowest index of the array returned by NTA.data_of_sample(sample, truncated = False) such that all sizes are below truncation_size.
-        This index doesn't apply to NTA.bins(), NTA.sizes(), etc.!
+        This index doesn't apply to NTA.bins(), NTA.counts(), etc.!
         '''
         truncation_index = -1
         for sample in self.samples:
@@ -237,44 +237,44 @@ class NTA():
             cumsum_maxima = []
         refresh_difference = (self.difference_enabled and need_refresh.difference)
         if refresh_difference:
-            all_size_differences = []
+            all_count_differences = []
         refresh_data = need_refresh.data
 
         overall_min, overall_max = 0, 0
-        previous_sizes = None
+        previous_counts = None
         last_bins = None
         if refresh_data:
-            all_bins, all_sizes = [], []
+            all_bins, all_counts = [], []
         else:
-            all_bins, all_sizes = self.bins(), self.sizes()
+            all_bins, all_counts = self.bins(), self.counts()
             width = self.bin_width
         data_of_sample = self.data_of_sample
         for i, sample in enumerate(self.samples):
             if not refresh_data:
-                bins, sizes = all_bins[i], all_sizes[i]
+                bins, counts = all_bins[i], all_counts[i]
             else:
                 data = data_of_sample(sample, truncated = True)
-                bins, sizes = data['/LowerBinDiameter_[nm]'], data['PSD_corrected_[counts/mL/nm]']
+                bins, counts = data['/LowerBinDiameter_[nm]'], data['PSD_corrected_[counts/mL/nm]']
                 width = bins[1] - bins[0]
                 
                 if last_bins is not None:
                     assert np.all(bins == last_bins) == True, 'Unequal sequence of bins between samples detected!'
                 last_bins = bins
-                # data_handler.parse_data(bins.to_numpy(dtype = np.double), sizes.to_numpy(dtype = np.double), sample.filename, self.output_folder, num_data_points)
+                # data_handler.parse_data(bins.to_numpy(dtype = np.double), counts.to_numpy(dtype = np.double), sample.filename, self.output_folder, num_data_points)
                 # data_handler.parse_data(
                 #     bins = bins.to_numpy(dtype = np.double),
-                #     sizes = sizes.to_numpy(dtype = np.double),
+                #     counts = counts.to_numpy(dtype = np.double),
                 #     sample_filename = sample.filename,
                 #     outputs_path = self.output_folder,
                 #     num_data_points = num_data_points)
                 all_bins.append(bins)
-                all_sizes.append(sizes)
+                all_counts.append(counts)
 
             # videos = sample.videos
             # all_histograms = np.array([np.histogram(video, bins = bins)[0] for video in videos])
             # avg_histogram = np.average(all_histograms, axis = 0)
             # total_std = np.std(all_histograms, axis = 0, ddof = 1)
-            # scale_factor = np.array([sizes[j]/avg if (avg := avg_histogram[j]) != 0 else 0 for j in range(len(sizes)-1)])
+            # scale_factor = np.array([counts[j]/avg if (avg := avg_histogram[j]) != 0 else 0 for j in range(len(counts)-1)])
             # error_resizing = 0.1
             # total_std *= scale_factor * error_resizing
             # avg_histogram *= scale_factor
@@ -282,10 +282,10 @@ class NTA():
             # avg_histograms.append(avg_histograms)
 
             if refresh_peaks:
-                assert len(lowpass_filter) <= len(sizes), f"kernel_size={len(lowpass_filter)} is too big, given {len(sizes)=}."
-                assert kernel2_size <= len(sizes), f"{kernel2_size=} is too big, given {len(sizes)=}."
+                assert len(lowpass_filter) <= len(counts), f"kernel_size={len(lowpass_filter)} is too big, given {len(counts)=}."
+                assert kernel2_size <= len(counts), f"{kernel2_size=} is too big, given {len(counts)=}."
                 bin_centers = bins + width/2
-                filtered = np.convolve(sizes, lowpass_filter, mode = 'same')
+                filtered = np.convolve(counts, lowpass_filter, mode = 'same')
                 maxima_candidates, = argrelextrema(filtered, np.greater)
                 twice_filtered = np.convolve(filtered, [1/kernel2_size]*kernel2_size, mode = 'same')
                 derivative = np.gradient(twice_filtered, bin_centers)
@@ -298,17 +298,17 @@ class NTA():
                 all_maxima.append(maxima)
                 all_rejected.append(rejected_candidates)
             if refresh_cumulative:
-                cumulative_sum = np.cumsum(sizes)*width
+                cumulative_sum = np.cumsum(counts)*width
                 cumulative_sums.append(cumulative_sum)
                 cumsum_maxima.append(cumulative_sum.max())
-            if refresh_difference and previous_sizes is not None:
-                size_differences = sizes - previous_sizes
-                all_size_differences.append(size_differences)
-                overall_max = max(size_differences.max(), overall_max)
-                overall_min = min(size_differences.min(), overall_min)
+            if refresh_difference and previous_counts is not None:
+                count_differences = counts - previous_counts
+                all_count_differences.append(count_differences)
+                overall_max = max(count_differences.max(), overall_max)
+                overall_min = min(count_differences.min(), overall_min)
             if refresh_data or refresh_difference:
-                overall_max = max(sizes.max(), overall_max)
-                overall_min = min(sizes.min(), overall_min)
+                overall_max = max(counts.max(), overall_max)
+                overall_min = min(counts.min(), overall_min)
             for setting in tuple(need_refresh.settings):
                 value = setting.value_callback(sample)
                 setting.set_value(sample, value)
@@ -316,25 +316,25 @@ class NTA():
             for calculation in tuple(need_refresh.calculations):
                 calculation.refresh(sample)
                 need_refresh.calculations.remove(calculation)
-            previous_sizes = sizes
+            previous_counts = counts
         
         tmp_filenames = self.tmp_filenames
         if refresh_data:
             np.save(tmp_filenames['bins'], vstack(all_bins))
-            np.save(tmp_filenames['sizes'], vstack(all_sizes))
+            np.save(tmp_filenames['counts'], vstack(all_counts))
             self.overall_min, self.overall_max = overall_min, overall_max
             self.bin_width = last_bins[1] - last_bins[0]
         # np.save(tmp_filenames['total_stds'], vstack(total_stds))
         # np.save(tmp_filenames['avg_histograms'], vstack(avg_histograms))
         if refresh_peaks:
-            np.save(tmp_filenames['filtered_sizes'], vstack(all_filtered))
+            np.save(tmp_filenames['filtered_counts'], vstack(all_filtered))
             self.maxima = all_maxima
             self.rejected_maxima = all_rejected
         if refresh_cumulative:
             np.save(tmp_filenames['cumulative_sums'], vstack(cumulative_sums))
             np.save(tmp_filenames['cumsum_maxima'], cumsum_maxima)
         if refresh_difference:
-            np.save(tmp_filenames['size_differences'], vstack(all_size_differences))
+            np.save(tmp_filenames['count_differences'], vstack(all_count_differences))
         self.need_recompute = False
         if prep_tabulation:
             self.prepare_tabulation()
@@ -494,8 +494,8 @@ class NTA():
                 return sample_bins[:truncation_index]
             return sample_bins
         return all_bins
-    def sizes(self, sample = None, truncation_size = None):
-        all_sizes = self.load_tempfile('sizes')
+    def counts(self, sample = None, truncation_size = None):
+        all_counts = self.load_tempfile('counts')
         
         if truncation_size is not None:
             assert sample is not None, "Must specify a sample when using truncation_size."
@@ -504,11 +504,11 @@ class NTA():
         
         if sample is not None:
             assert sample.index is not None, "The provided Sample object has no index."
-            sample_sizes = all_sizes[sample.index]
+            sample_counts = all_counts[sample.index]
             if truncation_size is not None:
-                return sample_sizes[:truncation_index]
-            return sample_sizes
-        return all_sizes
+                return sample_counts[:truncation_index]
+            return sample_counts
+        return all_counts
     def plot(self, grid_color = '0.8', name = 'Ridgeline plot'):
         assert self.need_recompute == False, "Must run NTA.compute() first."
         num_of_plots, samples, colors, table, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
@@ -519,11 +519,11 @@ class NTA():
         cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
         (_, height) = self.figsize
         tmp_filenames = self.tmp_filenames
-        all_bins, all_sizes = self.bins(), self.sizes()
+        all_bins, all_counts = self.bins(), self.counts()
         # avg_histograms, total_stds = np.load(tmp_filenames['avg_histograms']+'.npy'), np.load(tmp_filenames['total_stds']+'.npy')
         if peaks_enabled:
             rejected_maxima_marker, maxima_marker, filter_description, maxima_candidate_description, maxima_description = peak_settings['rejected_maxima_marker'], peak_settings['maxima_marker'], peak_settings['filter_description'], peak_settings['maxima_candidate_description'], peak_settings['maxima_description']
-            all_filtered = np.load(tmp_filenames['filtered_sizes']+'.npy')
+            all_filtered = np.load(tmp_filenames['filtered_counts']+'.npy')
             all_maxima, all_rejected = self.maxima, self.rejected_maxima
         if cumulative_enabled:
             cumulative_sums = np.load(tmp_filenames['cumulative_sums']+'.npy')
@@ -531,7 +531,7 @@ class NTA():
             max_of_cumulative_sums = cumsum_maxima.max()
             cumulative_sum_scaling = overall_max / max_of_cumulative_sums
         if difference_enabled:
-            all_size_differences = np.load(tmp_filenames['size_differences']+'.npy')
+            all_count_differences = np.load(tmp_filenames['count_differences']+'.npy')
 
         mpl.rcParams["figure.figsize"] = self.figsize
         fig, axs = plt.subplots(num_of_plots, 1, squeeze = False)
@@ -544,14 +544,14 @@ class NTA():
         origins = []
         for i, ax in enumerate(axs):
             sample = samples[i]
-            bins, sizes = all_bins[i], all_sizes[i]
-            # bins, sizes = data_handler.read_data(sample_filename = sample.filename, outputs_path = output_folder, num_data_points = num_data_points)
+            bins, counts = all_bins[i], all_counts[i]
+            # bins, counts = data_handler.read_data(sample_filename = sample.filename, outputs_path = output_folder, num_data_points = num_data_points)
             width = bins[1] - bins[0]
             bin_centers = bins + width/2
             # avg_histogram, total_std = avg_histograms[i], total_stds[i]
             
             plt.sca(ax)
-            plt.bar(bins, sizes, width = width, color = colors[i], alpha = 0.7, align = 'edge')
+            plt.bar(bins, counts, width = width, color = colors[i], alpha = 0.7, align = 'edge')
             
             if peaks_enabled:
                 filtered, maxima, rejected_candidates = all_filtered[i], all_maxima[i], all_rejected[i]
@@ -561,14 +561,14 @@ class NTA():
                 plt.plot(bin_centers[maxima], filtered[maxima], **maxima_marker)
             
             if difference_enabled and i != 0:
-                size_differences = all_size_differences[i-1]
-                plt.bar(bins, size_differences, width = width, color = 'black', alpha = 0.3, align = 'edge')
+                count_differences = all_count_differences[i-1]
+                plt.bar(bins, count_differences, width = width, color = 'black', alpha = 0.3, align = 'edge')
             
             videos = sample.videos
             all_histograms = np.array([np.histogram(video, bins = bins)[0] for video in videos])
             avg_histogram = np.average(all_histograms, axis = 0)
             total_std = np.std(all_histograms, axis = 0, ddof = 1)
-            scale_factor = np.array([sizes[j]/avg if (avg := avg_histogram[j]) != 0 else 0 for j in range(len(sizes)-1)])
+            scale_factor = np.array([counts[j]/avg if (avg := avg_histogram[j]) != 0 else 0 for j in range(len(counts)-1)])
             error_resizing = 0.1
             total_std *= scale_factor * error_resizing
             avg_histogram *= scale_factor

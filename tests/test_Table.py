@@ -63,8 +63,8 @@ class Test_Table(unittest.TestCase):
         times = settings.by_tag('time')
         def callback(sample):
             truncation_size = 200
-            sizes = nta.sizes(sample = sample)
-            truncated_sizes = nta.sizes(sample = sample, truncation_size = truncation_size)
+            counts = nta.counts(sample = sample)
+            truncated_counts = nta.counts(sample = sample, truncation_size = truncation_size)
 
             bin_width = nta.bin_width
             truncated_bins = nta.bins(sample = sample, truncation_size = truncation_size) # Bottoms of bins
@@ -72,8 +72,8 @@ class Test_Table(unittest.TestCase):
             top_nm = max(truncated_tops_of_bins)
             if top_nm.is_integer():
                 top_nm = int(top_nm)
-            total_conc = np.sum(sizes)*bin_width
-            total_conc_under_topnm = np.sum(truncated_sizes*bin_width)
+            total_conc = np.sum(counts)*bin_width
+            total_conc_under_topnm = np.sum(truncated_counts*bin_width)
             
             sample_index = sample.index
             time = times.get_value(sample) # times accessed via closure

@@ -6,6 +6,7 @@
 - Add a simple ViewSizer 3000 settings object that maps setting names and values from .xml to Setting objects
 - Housekeeping
   - Rename "sizes" to "counts" and possibly "bins" to "sizes"
+  - Rename kernel_size and its relatives to something like kernel_span to avoid confusion with particle sizes
   - Condense attribute initialization (self.x = x for some attribute x) into one line in Setting.__init__() and other places
   - Make diagram(s) of the codebase, laying out how data structures are handled, operated on, etc.
   - Rename format_callback to format_function? May be more accurate
