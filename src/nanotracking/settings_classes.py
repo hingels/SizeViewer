@@ -51,7 +51,7 @@ class Calculation():
         '''
         for sample in samples:
             self.output_values[sample] = self.value_callback(sample)
-    def representation_as_settings(self, format_name, samples):
+    def representation_as_setting(self, format_name, samples):
         '''
         Returns a Setting object whose subsettings represent the outputs of Calculation.value_callback, including their numerical values.
         A new Setting object is created each time this runs!

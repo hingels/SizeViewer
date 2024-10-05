@@ -72,8 +72,7 @@ class Table():
             group.add_subsetting(setting, setting.tag)
         self.add_setting(group)
     def add_calculation(self, calculation, format_name, column_number = None, column_name = None, column_width = None):
-        new_column = calculation.representation_as_settings(format_name, self.nta_obj.samples)
-        print("COL:", new_column.tag, [calculation.output_values[sample] for sample in self.nta_obj.samples], [new_column.get_value(sample) for sample in self.nta_obj.samples])
+        new_column = calculation.representation_as_setting(format_name, self.nta_obj.samples)
         new_column.set_attributes(column_number = column_number, column_name = column_name, column_width = column_width)
         self.add_setting(new_column)
     def add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
