@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ReportSettings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SamplePath>D:\HORIBA\VU-3000\Data\230709 1-100000 standard</SamplePath>
+  <XMin>0</XMin>
+  <XMax>1000</XMax>
+  <IntLimitMin>0</IntLimitMin>
+  <IntLimitMax>500</IntLimitMax>
+  <ChartType>0</ChartType>
+  <ReportImageType>Color</ReportImageType>
+</ReportSettings>

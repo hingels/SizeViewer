@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TemperatureLog xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Entries>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092648_0001.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092707_0002.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092719_0003.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092731_0004.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092743_0005.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092755_0006.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092807_0007.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092819_0008.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092831_0009.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092843_0010.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092855_0011.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092907_0012.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092919_0013.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092931_0014.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std, diff det settings_20230728_092943_0015.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+  </Entries>
+</TemperatureLog>

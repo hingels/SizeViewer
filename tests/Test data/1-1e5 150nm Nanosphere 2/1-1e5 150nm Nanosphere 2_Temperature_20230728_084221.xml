@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TemperatureLog xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Entries>
+    <Entry>
+      <File>230728 std_20230728_084221_0001.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084240_0002.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084252_0003.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084304_0004.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084316_0005.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084328_0006.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084340_0007.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084352_0008.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084404_0009.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084416_0010.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084428_0011.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084440_0012.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084452_0013.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084504_0014.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+    <Entry>
+      <File>230728 std_20230728_084516_0015.avi</File>
+      <Temp>20</Temp>
+    </Entry>
+  </Entries>
+</TemperatureLog>

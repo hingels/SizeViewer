@@ -1,0 +1,125 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TemperatureLog xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Entries>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141601_0001.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141614_0002.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141623_0003.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141632_0004.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141641_0005.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141650_0006.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141659_0007.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141708_0008.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141717_0009.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141726_0010.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141735_0011.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141744_0012.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141753_0013.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141802_0014.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141811_0015.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141820_0016.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141829_0017.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141838_0018.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141847_0019.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141856_0020.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141905_0021.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141914_0022.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141923_0023.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141932_0024.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141941_0025.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141950_0026.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_141959_0027.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_142008_0028.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_142017_0029.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+    <Entry>
+      <File>230709 1-100000 standard_20230709_142026_0030.avi</File>
+      <Temp>22</Temp>
+    </Entry>
+  </Entries>
+</TemperatureLog>

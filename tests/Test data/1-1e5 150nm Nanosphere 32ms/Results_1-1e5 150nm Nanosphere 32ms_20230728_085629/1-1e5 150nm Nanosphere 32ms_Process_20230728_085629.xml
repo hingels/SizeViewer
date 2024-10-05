@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ProcessingSettings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ProcessingMode>MPTA</ProcessingMode>
+  <StartDateTime>2023-07-28 08:56:30</StartDateTime>
+  <EndDataTime>2023-07-28 08:57:23</EndDataTime>
+  <QueueForProcessing>true</QueueForProcessing>
+  <VideoProcessEnabled>true</VideoProcessEnabled>
+  <PrintReport>false</PrintReport>
+  <LoadResults>true</LoadResults>
+  <SavePDFReport>false</SavePDFReport>
+  <FileName />
+  <ProcessDescription />
+  <DetectionThresholdType>Manual</DetectionThresholdType>
+  <DetectionThreshold>0.2</DetectionThreshold>
+  <FeatureSize>40</FeatureSize>
+  <StartingFrame>1</StartingFrame>
+  <FramesForAnalysis>300</FramesForAnalysis>
+  <OverrideParticleClusterAlgorithm>true</OverrideParticleClusterAlgorithm>
+  <DriftCorrection>0</DriftCorrection>
+  <SaveIntermediateImage>true</SaveIntermediateImage>
+  <SaveIntermediateFiles>true</SaveIntermediateFiles>
+  <SaveCommonImages>true</SaveCommonImages>
+</ProcessingSettings>
