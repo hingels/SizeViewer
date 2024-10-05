@@ -66,14 +66,13 @@ class Test_Table(unittest.TestCase):
             counts = nta.counts(sample = sample)
             truncated_counts = nta.counts(sample = sample, truncation_size = truncation_size)
 
-            bin_width = nta.bin_width
-            truncated_bins = nta.bins(sample = sample, truncation_size = truncation_size) # Bottoms of bins
-            truncated_tops_of_bins = nta.bin_width + truncated_bins
-            top_nm = max(truncated_tops_of_bins)
+            size_binwidth = nta.size_binwidth
+            truncated_sizes = nta.sizes(sample = sample, truncation_size = truncation_size, lower = False, upper = True)
+            top_nm = max(truncated_sizes)
             if top_nm.is_integer():
                 top_nm = int(top_nm)
-            total_conc = np.sum(counts)*bin_width
-            total_conc_under_topnm = np.sum(truncated_counts*bin_width)
+            total_conc = np.sum(counts)*size_binwidth
+            total_conc_under_topnm = np.sum(truncated_counts*size_binwidth)
             
             sample_index = sample.index
             time = times.get_value(sample) # times accessed via closure
@@ -160,9 +159,7 @@ class Test_Table(unittest.TestCase):
         num_columns = self.setup_test_persistence()
         nta.enable_peak_detection(
             kernel_size = 30,
-            # kernel_size = 10,
             kernel2_size = 20,
-            # kernel2_size = 10,
             kernel_std_in_bins = 4,
             second_derivative_threshold = -30,
             maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'},
