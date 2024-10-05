@@ -32,6 +32,7 @@ class Test_Table(unittest.TestCase):
         table.add_settings_by_tag('RedLaserPower', 'GreenLaserPower', 'BlueLaserPower', column_name = "Power\n(mW)", column_width = 0.19)
         table.add_settings_by_tag('Exposure', column_name = "Exposure,\ngain", column_width = 0.14)
         def get_detection_info(threshold_type, threshold):
+            if threshold is None: return threshold_type
             if threshold_type == 'Polydisperse': return threshold_type
             return f"{threshold_type}\n{threshold}"
         table.add_settings_by_tag('DetectionThresholdType', 'DetectionThreshold', column_name = "Detection\nsetting", column_width = 0.19, format_callback = get_detection_info)
@@ -158,9 +159,9 @@ class Test_Table(unittest.TestCase):
         nta = self.nta
         num_columns = self.setup_test_persistence()
         nta.enable_peak_detection(
-            kernel_size = 30,
-            kernel2_size = 20,
-            kernel_std_in_bins = 4,
+            gaussian_width = 30,
+            gaussian_std_in_bins = 4,
+            moving_avg_width = 20,
             second_derivative_threshold = -30,
             maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': 'black', 'linestyle': 'none'},
             rejected_maxima_marker = {'marker': 'o', 'fillstyle': 'none', 'color': '0.5', 'linestyle': 'none'}

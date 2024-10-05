@@ -48,9 +48,10 @@ class NeedRefresh:
 class NTA():
     def __init__(self, datafolder, output_folder, filenames, truncation_size):
         self.datafolder, self.output_folder, self.filenames = datafolder, output_folder, filenames
-        os.makedirs(output_folder, exist_ok = True)
         self.table, self.peak_settings = None, None
         self.table_enabled, self.cumulative_enabled, self.difference_enabled = False, False, False
+
+        samples, samples_setting = [], Setting('sample', datatype = Sample)
         def generate_samples():
             for folder in os.listdir(datafolder):
                 folder_path = os.path.join(datafolder, folder)
@@ -59,28 +60,26 @@ class NTA():
                 if sample.filename not in filenames: continue
                 yield sample.filename, sample
         unordered_samples = dict(generate_samples())
-        samples = []
         for i, name in enumerate(filenames):
             sample = unordered_samples[name]
             sample.index = i
             samples.append(sample)
-        self.samples = samples
-        self.truncation_index = self.find_truncation_index(truncation_size)
-        samples_setting = Setting('sample', datatype = Sample)
-        for sample in samples:
             samples_setting.set_value(sample, sample)
-        self.samples_setting = samples_setting
+        self.unordered_samples, self.samples, self.samples_setting = unordered_samples, samples, samples_setting
+        self.size_binwidth = None
+
+        os.makedirs(output_folder, exist_ok = True)
+        self.truncation_index = self.find_truncation_index(truncation_size)
+
         num_of_plots = len(samples)
         width, height = mpl.rcParamsDefault["figure.figsize"]
         height *= (num_of_plots/3)
         height = min(np.floor(65536/resolution), height)
-        self.figsize = (width, height)
-        self.colors = cm.plasma(np.linspace(0, 1, num_of_plots))
-        self.unordered_samples, self.num_of_plots = unordered_samples, num_of_plots
+        self.figsize, self.colors, self.num_of_plots = (width, height), cm.plasma(np.linspace(0, 1, num_of_plots)), num_of_plots
+        
         self.overall_min, self.overall_max = None, None
         self.maxima, self.rejected_maxima = None, None
-        self.size_binwidth = None
-        self.settings = None
+
         self.tmp_filenames = {
             'sizes': os.path.join(output_folder, 'sizes'),
             'counts': os.path.join(output_folder, 'counts'),
@@ -94,6 +93,8 @@ class NTA():
         self.calculations = dict()
         self.need_recompute = True
         self.need_refresh = NeedRefresh(settings = set(), calculations = set(), data = True, tabulation = True, peaks = False, cumulative = False, difference = False)
+        
+        self.settings = None
         self.configure_settings()
     def find_truncation_index(self, truncation_size):
         '''
@@ -110,8 +111,7 @@ class NTA():
         assert self.table is None, "Table already exists; must first call NTA.delete_table()."
         table = Table(self, width, margin_minimum_right, margin_left)
         self.table = table
-        self.need_recompute = True
-        self.need_refresh.tabulation = True
+        self.need_recompute, self.need_refresh.tabulation = True, True
         return table
     def delete_table(self):
         self.table = None
@@ -134,31 +134,27 @@ class NTA():
         return calculation
             
     def enable_peak_detection(self, gaussian_width, moving_avg_width, gaussian_std_in_bins, second_derivative_threshold, maxima_marker, rejected_maxima_marker):
-        peak_settings = locals(); peak_settings.pop('self')
         x = np.linspace(0, gaussian_width, gaussian_width)
         gaussian = np.exp(-np.power((x - gaussian_width/2)/gaussian_std_in_bins, 2)/2)/(gaussian_std_in_bins * np.sqrt(2*np.pi))
+        
+        peak_settings = locals(); peak_settings.pop('self')
         peak_settings['lowpass_filter'] = gaussian / gaussian.sum()
         peak_settings['filter_description'] = f"Black lines indicate Gaussian smoothing (a low-pass filter) with $\sigma = {gaussian_std_in_bins}$ bins and convolution kernel of width {gaussian_width} bins."
         peak_settings['maxima_candidate_description'] = f": Candidate peaks after smoothing, selected using argrelextrema in SciPy {scipy.__version__}."
         peak_settings['maxima_description'] = f": Peaks with under {second_derivative_threshold} counts/mL/nm$^3$ second derivative, computed after smoothing again with simple moving average of width {moving_avg_width} bins."
         self.peak_settings = peak_settings
-        self.need_recompute = True
-        self.need_refresh.tabulation = True
-        self.need_refresh.peaks = True
+        
+        self.need_recompute, self.need_refresh.tabulation, self.need_refresh.peaks = True, True, True
     def disable_peak_detection(self):
         self.peak_settings = None
     def enable_cumulative(self):
         self.cumulative_enabled = True
-        self.need_recompute = True
-        self.need_refresh.tabulation = True
-        self.need_refresh.cumulative = True
+        self.need_recompute, self.need_refresh.tabulation, self.need_refresh.cumulative = True, True, True
     def disable_cumulative(self):
         self.cumulative_enabled = False
     def enable_difference(self):
         self.difference_enabled = True
-        self.need_recompute = True
-        self.need_refresh.tabulation = True
-        self.need_refresh.difference = True
+        self.need_recompute, self.need_refresh.tabulation, self.need_refresh.difference = True, True, True
     def disable_difference(self):
         self.difference_enabled = False
     def configure_settings(self):
@@ -218,7 +214,6 @@ class NTA():
             return all_data.iloc[:truncation_index, :]
         return all_data
     def compute(self, prep_tabulation = True):
-        need_refresh = self.need_refresh
         def vstack(arrays):
             if len(arrays) == 0:
                 try: return arrays[0]
@@ -227,27 +222,24 @@ class NTA():
         
         peak_settings = self.peak_settings
         peaks_enabled = (peak_settings is not None)
-        refresh_peaks = (peaks_enabled and need_refresh.peaks)
-        if refresh_peaks:
-            lowpass_filter, moving_avg_width, second_derivative_threshold = peak_settings['lowpass_filter'], peak_settings['moving_avg_width'], peak_settings['second_derivative_threshold']
-            all_filtered, all_maxima, all_rejected  = [], [], []
-        refresh_cumulative = (self.cumulative_enabled and need_refresh.cumulative)
-        if refresh_cumulative:
-            cumulative_sums = []
-            cumsum_maxima = []
-        refresh_difference = (self.difference_enabled and need_refresh.difference)
-        if refresh_difference:
-            all_count_differences = []
+        need_refresh = self.need_refresh
         refresh_data = need_refresh.data
-
-        overall_min, overall_max = 0, 0
-        previous_counts = None
-        last_sizes = None
+        refresh_peaks, refresh_cumulative, refresh_difference = (peaks_enabled and need_refresh.peaks), (self.cumulative_enabled and need_refresh.cumulative), (self.difference_enabled and need_refresh.difference)
         if refresh_data:
             all_sizes, all_counts = [], []
         else:
             all_sizes, all_counts = self.sizes(), self.counts()
             size_binwidth = self.size_binwidth
+        if refresh_peaks:
+            lowpass_filter, moving_avg_width, second_derivative_threshold = peak_settings['lowpass_filter'], peak_settings['moving_avg_width'], peak_settings['second_derivative_threshold']
+            all_filtered, all_maxima, all_rejected  = [], [], []
+        if refresh_cumulative:
+            cumulative_sums, cumsum_maxima = [], []
+        if refresh_difference:
+            all_count_differences = []
+        
+        previous_sizes, previous_counts = None, None
+        overall_min, overall_max = 0, 0
         data_of_sample = self.data_of_sample
         for i, sample in enumerate(self.samples):
             if not refresh_data:
@@ -257,9 +249,9 @@ class NTA():
                 sizes, counts = data['/LowerBinDiameter_[nm]'], data['PSD_corrected_[counts/mL/nm]']
                 size_binwidth = sizes[1] - sizes[0]
                 
-                if last_sizes is not None:
-                    assert np.all(sizes == last_sizes) == True, 'Unequal sequence of size bins between samples detected!'
-                last_sizes = sizes
+                if previous_sizes is not None:
+                    assert np.all(sizes == previous_sizes) == True, 'Unequal sequence of size bins between samples detected!'
+                previous_sizes = sizes
                 # data_handler.parse_data(sizes.to_numpy(dtype = np.double), counts.to_numpy(dtype = np.double), sample.filename, self.output_folder, num_data_points)
                 # data_handler.parse_data(
                 #     sizes = sizes.to_numpy(dtype = np.double),
@@ -294,13 +286,10 @@ class NTA():
                 maxima = np.array([index for index in maxima_candidates if index in second_deriv_negative])
                 assert len(maxima) != 0, 'No peaks found. The second derivative threshold may be too high.'
                 rejected_candidates = np.array([entry for entry in maxima_candidates if entry not in maxima])
-                all_filtered.append(filtered)
-                all_maxima.append(maxima)
-                all_rejected.append(rejected_candidates)
+                all_filtered.append(filtered); all_maxima.append(maxima); all_rejected.append(rejected_candidates)
             if refresh_cumulative:
                 cumulative_sum = np.cumsum(counts)*size_binwidth
-                cumulative_sums.append(cumulative_sum)
-                cumsum_maxima.append(cumulative_sum.max())
+                cumulative_sums.append(cumulative_sum); cumsum_maxima.append(cumulative_sum.max())
             if refresh_difference and previous_counts is not None:
                 count_differences = counts - previous_counts
                 all_count_differences.append(count_differences)
@@ -323,13 +312,12 @@ class NTA():
             np.save(tmp_filenames['sizes'], vstack(all_sizes))
             np.save(tmp_filenames['counts'], vstack(all_counts))
             self.overall_min, self.overall_max = overall_min, overall_max
-            self.size_binwidth = last_sizes[1] - last_sizes[0]
+            self.size_binwidth = previous_sizes[1] - previous_sizes[0]
         # np.save(tmp_filenames['total_stds'], vstack(total_stds))
         # np.save(tmp_filenames['avg_histograms'], vstack(avg_histograms))
         if refresh_peaks:
             np.save(tmp_filenames['filtered_counts'], vstack(all_filtered))
-            self.maxima = all_maxima
-            self.rejected_maxima = all_rejected
+            self.maxima, self.rejected_maxima = all_maxima, all_rejected
         if refresh_cumulative:
             np.save(tmp_filenames['cumulative_sums'], vstack(cumulative_sums))
             np.save(tmp_filenames['cumsum_maxima'], cumsum_maxima)
@@ -339,14 +327,11 @@ class NTA():
         if prep_tabulation:
             self.prepare_tabulation()
     def prepare_tabulation(self):
-        table, settings, num_of_plots, samples, unordered_samples = self.table, self.settings, self.num_of_plots, self.samples, self.unordered_samples
-        table_enabled = self.table_enabled
+        table, table_enabled, settings, num_of_plots, samples = self.table, self.table_enabled, self.settings, self.num_of_plots, self.samples
         if table_enabled:
             self.table.reset_columns() # If prepare_tabulation() has been run before, remove the columns for treatments and waits.
-            column_widths = table.column_widths
-            column_names = table.column_names
-            include_experimental_unit = table.include_experimental_unit
-            treatments_and_waits = table.treatments_and_waits
+            column_names, column_widths = table.column_names, table.column_widths
+            include_experimental_unit, treatments_and_waits = table.include_experimental_unit, table.treatments_and_waits
             include_treatments = (treatments_and_waits is not None)
             if include_treatments:
                 treatments_waits_columnIndex = treatments_and_waits[0]
@@ -381,87 +366,77 @@ class NTA():
                             column_quantities[tag] = quantity
                             continue
                         column_quantities[tag] = max(column_quantities[tag], quantity)
-            if table_enabled:
-                for i in range(len(column_names) + 1): # +1 accounts for the case where len(column_names) = 1. Still may want to insert treatments_and_waits columns at index 0.
-                    if i == treatments_waits_columnIndex:
-                        num_of_treatments = column_quantities['treatment']
-                        num_of_waits = column_quantities['wait']
-                        treatment_column_name, treatment_column_width = treatments_and_waits[1]
-                        wait_column_name, wait_column_width = treatments_and_waits[2]
-                        index = 0
-                        for j in range(max(num_of_treatments, num_of_waits)):
-                            if j < num_of_treatments:
-                                column_names.insert(i + index, treatment_column_name.format(treatment_number = j + 1))
-                                column_widths.insert(i + index, treatment_column_width)
-                                index += 1
-                            if j < num_of_waits:
-                                column_names.insert(i + index, wait_column_name.format(wait_number = j + 1))
-                                column_widths.insert(i + index, wait_column_width)
-                                index += 1
-                            
+            
+            if not table_enabled: return
+            
+            if include_treatments:
+                num_of_treatments, num_of_waits = column_quantities['treatment'], column_quantities['wait']
+                treatment_column_name, treatment_column_width = treatments_and_waits[1]
+                wait_column_name, wait_column_width = treatments_and_waits[2]
+                index = 0
+                for i in range(max(num_of_treatments, num_of_waits)):
+                    if i < num_of_treatments:
+                        column_names.insert(treatments_waits_columnIndex + index, treatment_column_name.format(treatment_number = i + 1))
+                        column_widths.insert(treatments_waits_columnIndex + index, treatment_column_width)
+                        index += 1
+                    if i < num_of_waits:
+                        column_names.insert(treatments_waits_columnIndex + index, wait_column_name.format(wait_number = i + 1))
+                        column_widths.insert(treatments_waits_columnIndex + index, wait_column_width)
+                        index += 1
+            
             for i in range(num_of_plots):
                 row = []
                 sample = samples[i]
-                if table_enabled:
-                    if include_treatments:
-                        treatments = get_multivalued('treatment', sample)
-                        waits = get_multivalued('wait', sample)
-                        for j in range( max(column_quantities['treatment'], column_quantities['wait']) ):
-                            if j < len(treatments): row.append(treatments[j])
-                            elif j < column_quantities['treatment']: row.append(None)
-                            if j < len(waits): row.append(waits[j])
-                            elif j < column_quantities['wait']: row.append(None)
-                    if include_experimental_unit:
-                        experimental_unit = settings.by_tag('experimental_unit')
-                        text = ''
-                        if experimental_unit is not None:
-                            value = experimental_unit.get_value(sample)
-                            text += value if value is not None else ''
-                            if hasattr(experimental_unit, 'age'):
-                                age = experimental_unit.age.get_value(sample)
-                                text += f"\n{age:.1f} d old" if age is not None else ''
-                        row.append(text)
-                    columns = list(table.columns_as_Settings_object.column_numbers.items())
-                    columns.sort()
-                    for j, column in columns:
-                        # content = '\n'.join(
-                        #     setting.show_name*f"{setting.short_name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
-                        #     for setting in column if setting.get_value(sample) is not None )
-                        # row.append(content)
-                        assert len(column) == 1, "There can be only one Setting object per column."
-                        if column[0].tag.startswith('COLUMN'):
-                            group = column[0]
-                            grouped_settings = group.subsettings.values()
-                            if group.format_callback is not None:
-                                row.append(group.format_callback(*(setting.get_value(sample) for setting in grouped_settings)))
-                                continue
-                            row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
-                        elif column[0].tag.startswith('CALC'):
-                            group = column[0]
-                            # grouped_settings, values = group.subsettings.values(), group.get_value(sample) # These line up; will use zip below
-                            grouped_settings = group.subsettings.values()
-                            values = [subsetting.get_value(sample) for subsetting in grouped_settings]
-                            if group.format_callback is not None:
-                                row.append(group.format_callback(*values))
-                                continue
-                            row.append(group.format_string.format(**{setting.tag: value for setting, value in zip(grouped_settings, values)}))
-                        else:
-                            setting = column[0]
-                            value = setting.get_value(sample)
-                            if setting.format_callback is None:
-                                row.append(setting.format_string.format(**{setting.tag: value}))
-                            else:
-                                row.append(setting.format_callback(value))
 
+                if include_treatments:
+                    treatments = get_multivalued('treatment', sample)
+                    waits = get_multivalued('wait', sample)
+                    for j in range( max(column_quantities['treatment'], column_quantities['wait']) ):
+                        if j < len(treatments): row.append(treatments[j])
+                        elif j < column_quantities['treatment']: row.append(None)
+                        if j < len(waits): row.append(waits[j])
+                        elif j < column_quantities['wait']: row.append(None)
+                if include_experimental_unit:
+                    experimental_unit = settings.by_tag('experimental_unit')
+                    text = ''
+                    if experimental_unit is not None:
+                        value = experimental_unit.get_value(sample)
+                        text += value if value is not None else ''
+                        if hasattr(experimental_unit, 'age'):
+                            age = experimental_unit.age.get_value(sample)
+                            text += f"\n{age:.1f} d old" if age is not None else ''
+                    row.append(text)
+                columns = list(table.columns_as_Settings_object.column_numbers.items())
+                columns.sort()
+                for j, column in columns:
+                    # content = '\n'.join(
+                    #     setting.show_name*f"{setting.short_name}: " + f"{setting.get_value(sample)}" + setting.show_unit*f" ({setting.units})"
+                    #     for setting in column if setting.get_value(sample) is not None )
+                    # row.append(content)
+                    assert len(column) == 1, "There can be only one Setting object per column."
+                    if column[0].tag.startswith('COLUMN'):
+                        group = column[0]
+                        grouped_settings = group.subsettings.values()
+                        if group.format_callback is not None:
+                            row.append(group.format_callback(*(setting.get_value(sample) for setting in grouped_settings)))
+                            continue
+                        row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
+                    elif column[0].tag.startswith('CALC'):
+                        group = column[0]
+                        grouped_settings = group.subsettings.values()
+                        values = [subsetting.get_value(sample) for subsetting in grouped_settings]
+                        if group.format_callback is not None:
+                            row.append(group.format_callback(*values))
+                            continue
+                        row.append(group.format_string.format(**{setting.tag: value for setting, value in zip(grouped_settings, values)}))
+                    else:
+                        setting = column[0]
+                        value = setting.get_value(sample)
+                        if setting.format_callback is None:
+                            row.append(setting.format_string.format(**{setting.tag: value}))
+                        else:
+                            row.append(setting.format_callback(value))
                 
-                # if detection_threshold is None:
-                #     row.append(detection_mode)
-                # else:
-                #     row.append(f"{detection_mode}\n{detection_threshold}")
-                # results_for_csv.previous.set_value(sample, previous)
-                # results_for_csv.time_since_previous.set_value(sample, time_since_previous)
-                # results_for_csv.total_conc.set_value(sample, f"{data_sums[1][1]:.2E}")
-                # results_for_csv.total_conc_under_topnm.set_value(sample, f"{data_sums[0][1]:.2E}")
                 row.append("")
                 yield row
         self.rows = tuple(generate_rows())
@@ -514,12 +489,11 @@ class NTA():
         num_of_plots, samples, colors, table, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
         peaks_enabled = (peak_settings is not None)
         table_enabled = self.table_enabled
+        cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
         if table_enabled:
             assert self.need_refresh.tabulation == False, "Must run NTA.prepare_tabulation() first."
-        cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
-        (_, height) = self.figsize
-        tmp_filenames = self.tmp_filenames
         all_sizes, all_counts = self.sizes(), self.counts()
+        tmp_filenames = self.tmp_filenames
         # avg_histograms, total_stds = np.load(tmp_filenames['avg_histograms']+'.npy'), np.load(tmp_filenames['total_stds']+'.npy')
         if peaks_enabled:
             rejected_maxima_marker, maxima_marker, filter_description, maxima_candidate_description, maxima_description = peak_settings['rejected_maxima_marker'], peak_settings['maxima_marker'], peak_settings['filter_description'], peak_settings['maxima_candidate_description'], peak_settings['maxima_description']
@@ -536,6 +510,7 @@ class NTA():
         mpl.rcParams["figure.figsize"] = self.figsize
         fig, axs = plt.subplots(num_of_plots, 1, squeeze = False)
         axs = axs[:,0]  # Flatten axs from a 2D array (of size num_of_plots x 1) to a 1D array
+        (_, height) = self.figsize
         fig.subplots_adjust(hspace=-0.05*height)
         transFigure = fig.transFigure
         transFigure_inverted = transFigure.inverted()
@@ -543,8 +518,7 @@ class NTA():
         final_i = num_of_plots - 1
         origins = []
         for i, ax in enumerate(axs):
-            sample = samples[i]
-            sizes, counts = all_sizes[i], all_counts[i]
+            sample, sizes, counts = samples[i], all_sizes[i], all_counts[i]
             # sizes, counts = data_handler.read_data(sample_filename = sample.filename, outputs_path = output_folder, num_data_points = num_data_points)
             size_binwidth = sizes[1] - sizes[0]
             bin_centers = sizes + size_binwidth/2
@@ -569,9 +543,9 @@ class NTA():
             avg_histogram = np.average(all_histograms, axis = 0)
             total_std = np.std(all_histograms, axis = 0, ddof = 1)
             scale_factor = np.array([counts[j]/avg if (avg := avg_histogram[j]) != 0 else 0 for j in range(len(counts)-1)])
+            avg_histogram *= scale_factor
             error_resizing = 0.1
             total_std *= scale_factor * error_resizing
-            avg_histogram *= scale_factor
             errorbars = np.array(list(zip(total_std, [0]*len(total_std)))).T
             plt.errorbar(bin_centers[:-1], avg_histogram, yerr = errorbars, elinewidth = 1, linestyle = '', marker = '.', ms = 1, alpha = 0.5, color = 'black')            
             
@@ -586,8 +560,7 @@ class NTA():
                 ax.spines.left.set_visible(True)
             else:
                 ax.spines['bottom'].set_position(('data', 0))
-                plt.yticks([])
-                plt.xticks([])
+                plt.yticks([]); plt.xticks([])
 
             origin_transDisplay = ax.transData.transform([0, 0])
             origins.append(transFigure_inverted.transform(origin_transDisplay))
@@ -596,12 +569,11 @@ class NTA():
                 cumulative_sum = cumulative_sums[i]
                 plt.plot(sizes, cumulative_sum*cumulative_sum_scaling, color = 'red', linewidth = 0.5)
 
-        final_ax = ax   # Using the ax from the final (bottom) plot:
-        final_ax.xaxis.set_tick_params(width = 2)
-        final_ax.yaxis.set_tick_params(width = 2)
+        final_ax = axs[-1]
+        final_ax.xaxis.set_tick_params(width = 2); final_ax.yaxis.set_tick_params(width = 2)
         transData = final_ax.transData
-        tick_values, tick_labels = plt.xticks()
 
+        tick_values, tick_labels = plt.xticks()
         final_i = len(tick_values) - 1
         right_edge_figure = None
         for i, tick_value in enumerate(tick_values):
@@ -615,7 +587,6 @@ class NTA():
             if i == final_i:
                 right_edge_figure = figure_x
 
-
         plt.text(0, 0.45, "Particle size distribution (counts/mL/nm)", fontsize=12, transform = transFigure, rotation = 'vertical', verticalalignment = 'center')
         text_y = 0 + text_shift
         if difference_enabled:
@@ -627,9 +598,7 @@ class NTA():
             text_y -= 0.02
             plt.text(0, text_y, f"Red lines are cumulative sums of unsmoothed data, scaled by {cumulative_sum_scaling:.3}.", fontsize=12, transform = transFigure, verticalalignment = 'center')
         if peaks_enabled:
-            icon_x = 0.01
-            text_x = 0.02
-
+            icon_x, text_x = 0.01, 0.02
             text_y -= 0.02
             rejected_maxima_icon, = plt.plot([icon_x], [text_y], **rejected_maxima_marker, transform = transFigure)
             rejected_maxima_icon.set_clip_on(False)

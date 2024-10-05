@@ -45,42 +45,41 @@ def compare_info(settings, samples, calculations, output_folder):
                 yield entry_name, entry, [sample.filename for sample in samples], [entry.apply_format(format_name, sample) for sample in samples]
     entry_names, entries, filenames, values = zip(*get_values())
 
-    same_valued_entries = []
-    different_valued_entries = []
+    same_valued_entries, different_valued_entries = [], []
     for entry_name, entry, sample_filenames, sample_values in zip(entry_names, entries, filenames, values):
         if entry is blank:
-            same_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
-            different_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
+            same_valued_entries.append((entry_name, sample_filenames, sample_values))
+            different_valued_entries.append((entry_name, sample_filenames, sample_values))
             continue
         sample_values = np.array(sample_values, dtype = object)
         are_same = np.all(sample_values == sample_values[0])
         if are_same:
-            same_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
+            same_valued_entries.append((entry_name, sample_filenames, sample_values))
         else:
-            different_valued_entries.append((entry_name, entry, sample_filenames, sample_values))
+            different_valued_entries.append((entry_name, sample_filenames, sample_values))
     
     all_csv_dataframe = pd.DataFrame(
         data = (
             pd.Series(sample_values, index = sample_filenames)
-            for sample_filenames, entry, sample_values in zip(filenames, entries, values)
+            for sample_filenames, sample_values in zip(filenames, values)
         ), index = entry_names
     )
     all_csv_dataframe.to_csv(os.path.join(output_folder, 'all.csv'))
     
-    names_of_same, entries_of_same, filenames_of_same, values_of_same = zip(*same_valued_entries)
+    names_of_same, filenames_of_same, values_of_same = zip(*same_valued_entries)
     same_values_csv_dataframe = pd.DataFrame(
         data = (
             pd.Series(sample_values_of_same, index = sample_filenames_of_same)
-            for sample_filenames_of_same, entry, sample_values_of_same in zip(filenames_of_same, entries_of_same, values_of_same)
+            for sample_filenames_of_same, sample_values_of_same in zip(filenames_of_same, values_of_same)
         ), index = names_of_same
     )
     same_values_csv_dataframe.to_csv(os.path.join(output_folder, 'same_values.csv'))
     
-    names_of_different, entries_of_different, filenames_of_different, values_of_different = zip(*different_valued_entries)
+    names_of_different, filenames_of_different, values_of_different = zip(*different_valued_entries)
     different_values_csv_dataframe = pd.DataFrame(
         data = (
             pd.Series(sample_values_of_different, index = sample_filenames_of_different)
-            for sample_filenames_of_different, entry, sample_values_of_different in zip(filenames_of_different, entries_of_different, values_of_different)
+            for sample_filenames_of_different, sample_values_of_different in zip(filenames_of_different, values_of_different)
         ), index = names_of_different
     )
     different_values_csv_dataframe.to_csv(os.path.join(output_folder, 'different_values.csv'))

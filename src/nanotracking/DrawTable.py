@@ -99,30 +99,21 @@ class Table():
         self.column_widths = self.columns_as_Settings_object.column_widths.copy()
 
     def draw_table(self, fig, ax, rows, edges, grid_color):
-        right_edge_figure = edges['right']
-        table_bottom = edges['bottom']
-        table_top = edges['top']
-        column_names = self.column_names
-        column_widths = self.column_widths
-        table_width = self.width
-        margin_minimum_right = self.margin_minimum_right
-        margin_left = self.margin_left
-        transFigure = fig.transFigure
+        right_edge_figure, table_bottom, table_top = edges['right'], edges['bottom'], edges['top']
+        column_names, column_widths = self.column_names, self.column_widths
+        table_width, margin_minimum_right, margin_left = self.width, self.margin_minimum_right, self.margin_left
+        edge = right_edge_figure + margin_left
         
         width_sum = sum([col_width for name, col_width in zip(column_names, column_widths) if name != ''])
         margin_right = table_width - width_sum
         assert margin_right >= margin_minimum_right, f"margin_right = {margin_right} < margin_minimum_right = {margin_minimum_right}. Try increasing the table's \"width\" setting."
-        column_widths.append(margin_right)
-        column_names.append("")
-        # display_coords = final_ax.transData.transform([0, overall_min])
-        edge = right_edge_figure + margin_left
+        column_names.append(""); column_widths.append(margin_right)
         table = ax.table(
             rows,
             bbox = mpl.transforms.Bbox([[edge, table_bottom], [edge + table_width, table_top]]),
-            transform = transFigure,
+            transform = fig.transFigure,
             cellLoc = 'left', colWidths = column_widths)
-        table.auto_set_font_size(False)
-        table.set_fontsize(12)
+        table.auto_set_font_size(False); table.set_fontsize(12)
         fig.add_artist(table)
         for i, name in enumerate(column_names):
             new_cell = table.add_cell(-1, i, width = column_widths[i], height = 0.1, text = name, loc = 'left')

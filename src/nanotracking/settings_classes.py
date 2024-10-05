@@ -21,16 +21,10 @@ class Calculation():
         Calculation.refresh() must be called immediately after a new Calculation is initialized.
         To skip this, use the keyword argument "samples" to specify which samples to use when refreshing.
         '''
-        self.name = name
-        self.value_callback = value_callback
-        
-        self.output_names = output_names
-        self.output_values = dict()
         if units is None: units = ''
-        self.units = units
-
-        self.formats = dict()
-
+        self.name, self.value_callback = name, value_callback
+        self.output_names, self.output_values = output_names, dict()
+        self.units, self.formats = units, dict()
         if samples is not None:
             self.refresh(*samples)
     def add_format(self, name, format_callback = None, format_string = None):
@@ -69,38 +63,29 @@ class Calculation():
 
 class Setting():
     def __init__(self, tag, short_name = None, format_string = None, format_callback = None, value_callback = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
-        self.tag = tag
         if name is None: name = tag
-        self.name = name
         if short_name is None: short_name = name
-        self.short_name = short_name
-        self.show_unit = show_unit
-        self.show_name = show_name
         if format_string is None:
             format_string = show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
-        self.format_string = format_string
-        self.format_callback = format_callback
-        self.value_callback = value_callback
-        self.units = units
-        self.column_number = column_number
-        self.column_name = column_name
-        self.column_width = column_width
+        self.tag, self.short_name = tag, short_name
+        self.format_string, self.format_callback = format_string, format_callback
+        self.value_callback, self.datatype = value_callback, datatype
+        self.name, self.show_name = name, show_name
+        self.units, self.show_unit = units, show_unit
+        self.column_number, self.column_name, self.column_width = column_number, column_name, column_width
+        self.depends_on, self.dependencies_require = depends_on, dependencies_require
+        self.hidden = hidden
+
         self.sample_values = dict()
         if sample_values is not None:
             for sample, value in sample_values.items():
                 self.set_value(sample, value)
 
-        self.subsettings = OrderedDict()
-        self.numbered_subsettings = OrderedDict()
+        self.subsettings, self.numbered_subsettings = OrderedDict(), OrderedDict()
         if subsettings is not None:
             for subtag, subsetting in subsettings.items():
                 self.add_subsetting(subtag, subsetting)
         
-        self.datatype = datatype
-        self.depends_on = depends_on
-        self.dependencies_require = dependencies_require
-
-        self.hidden = hidden
     def add_subsetting(self, subsetting, subtag):
         self.subsettings[subtag] = subsetting
         if type(subtag) is int:
@@ -140,12 +125,11 @@ class Setting():
             self.__setattr__(name, value)
 class Settings():
     def __init__(self, settings_dict = None):
+        self.tags, self.column_numbers, self.column_names = OrderedDict(), OrderedDict(), OrderedDict()
+        self.column_widths = []
         if settings_dict is None:
             settings_dict = OrderedDict()
-        self.tags = OrderedDict()
-        self.column_numbers = OrderedDict()
-        self.column_names = OrderedDict()
-        self.column_widths = []
+            return
         for tag, setting in settings_dict.items():
             self.add_setting(tag, setting)
     def by_tag(self, tag):
@@ -153,21 +137,16 @@ class Settings():
         if tag not in tags: return None
         return tags[tag]
     def add_setting(self, tag, setting):
-        tags = self.tags
+        tags, column_numbers, column_names = self.tags, self.column_numbers, self.column_names
         assert tag not in tags
         tags[tag] = setting
         
         self.column_widths.append(setting.column_width)
-        
-        column_numbers = self.column_numbers
-        column_number = setting.column_number
+        column_number, column_name = setting.column_number, setting.column_name
         if column_number is not None:
             if column_number not in column_numbers:
                 column_numbers[column_number] = []
             column_numbers[column_number].append(setting)
-        
-        column_names = self.column_names
-        column_name = setting.column_name
         if column_name is not None:
             if column_name not in column_names:
                 column_names[column_name] = []
@@ -186,27 +165,26 @@ class Settings():
                     setting.set_value(sample, None)
     def parse_time(self, sample):
         if 'MeasurementStartDateTime' not in self.tags: return
-        measurement_time = datetime.strptime(self.by_tag('MeasurementStartDateTime').get_value(sample), '%Y-%m-%d %H:%M:%S')
         if 'time' not in self.tags:
             time_setting = Setting('time', hidden = True)
             self.add_setting('time', time_setting)
+        measurement_time = datetime.strptime(self.by_tag('MeasurementStartDateTime').get_value(sample), '%Y-%m-%d %H:%M:%S')
         self.by_tag('time').set_value(sample, measurement_time, datatype = datetime)
         
         if 'experimental_unit' not in self.tags: return
         experimental_unit = self.by_tag('experimental_unit')
-        if hasattr(experimental_unit, 'date') is False: return
+        if not hasattr(experimental_unit, 'date'): return
         experimental_unit_date = datetime.strptime(experimental_unit.date.get_value(sample), '%Y/%m/%d')
         age = (measurement_time - experimental_unit_date).total_seconds() / 86400
         
-        if hasattr(experimental_unit, 'age') is False:
+        if not hasattr(experimental_unit, 'age'):
             age_subsetting = Setting('age', name = 'Age', units = 'days', datatype = float)
             experimental_unit.add_subsetting(age_subsetting, 'age')
         experimental_unit.age.set_value(sample, age)
     def read_files(self, sample: Sample, dependencies: dict = None):
         if dependencies is None: dependencies = dict()
         tags = self.tags
-        by_tag = self.by_tag
-        add_setting = self.add_setting
+        by_tag, add_setting = self.by_tag, self.add_setting
         with open(sample.xml) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
@@ -243,16 +221,14 @@ class Settings():
                 if len(tag_split) == 1:        # If has no subvalues:
                     setting.set_value(sample, value)
                     continue
-                
                 assert len(tag_split) == 2
                 subtag = tag_split[1]
                 
-                units = ''
                 if subtag.isdigit():
                     assert float(subtag).is_integer()
                     subtag = int(subtag)
                     units = setting.units
-                
+                else: units = ''
                 if subtag not in setting.subsettings:
                     subsetting = Setting(full_tag, name = f"{setting.name}: {subtag}", units = units)
                     setting.add_subsetting(subsetting, subtag)
