@@ -56,7 +56,7 @@ class Calculation():
             output = Setting(output_name, datatype = None)
             for sample in samples:
                 output.set_value(sample, output_values[sample][i])
-            settings_representation.add_subsetting(output, output_name)
+            settings_representation.add_subsetting(output_name, output)
         # settings_representation.value_callback = self.value_callback
         settings_representation.format_callback = self.formats[format_name]
         return settings_representation
@@ -86,7 +86,7 @@ class Setting():
             for subtag, subsetting in subsettings.items():
                 self.add_subsetting(subtag, subsetting)
         
-    def add_subsetting(self, subsetting, subtag):
+    def add_subsetting(self, subtag, subsetting):
         self.subsettings[subtag] = subsetting
         if type(subtag) is int:
             self.numbered_subsettings[subtag] = subsetting
@@ -179,7 +179,7 @@ class Settings():
         
         if not hasattr(experimental_unit, 'age'):
             age_subsetting = Setting('age', name = 'Age', units = 'days', datatype = float)
-            experimental_unit.add_subsetting(age_subsetting, 'age')
+            experimental_unit.add_subsetting('age', age_subsetting)
         experimental_unit.age.set_value(sample, age)
     def read_files(self, sample: Sample, dependencies: dict = None):
         if dependencies is None: dependencies = dict()
@@ -231,7 +231,7 @@ class Settings():
                 else: units = ''
                 if subtag not in setting.subsettings:
                     subsetting = Setting(full_tag, name = f"{setting.name}: {subtag}", units = units)
-                    setting.add_subsetting(subsetting, subtag)
+                    setting.add_subsetting(subtag, subsetting)
                 else:
                     subsetting = setting.subsettings[subtag]
                 

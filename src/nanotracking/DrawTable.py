@@ -69,7 +69,7 @@ class Table():
         group = Setting('COLUMN_' + '_'.join(tags) + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format_string = format_string, format_callback = format_callback)
         for setting in settings:
             prepare_setting(setting)
-            group.add_subsetting(setting, setting.tag)
+            group.add_subsetting(setting.tag, setting)
         self.add_setting(group)
     def add_calculation(self, calculation, format_name, column_number = None, column_name = None, column_width = None):
         new_column = calculation.representation_as_setting(format_name, self.nta_obj.samples)
