@@ -30,7 +30,7 @@ class Test_Table(unittest.TestCase):
         table.add_treatments_and_waits("Treatment\n{treatment_number}\n(µM)", 0.2, "4°C\nwait\n{wait_number}\n(h)", 0.07)
         table.add_settings_by_tag('filter', column_name = "Filter\ncut-on\n(nm)", column_width = 0.1)
         table.add_settings_by_tag('RedLaserPower', 'GreenLaserPower', 'BlueLaserPower', column_name = "Power\n(mW)", column_width = 0.19)
-        table.add_settings_by_tag('Exposure', column_name = "Exposure,\ngain", column_width = 0.14)
+        table.add_settings_by_tag('Exposure', 'Gain', column_name = "Exposure\n(ms),\ngain (dB)", column_width = 0.14)
         def get_detection_info(threshold_type, threshold):
             if threshold is None: return threshold_type
             if threshold_type == 'Polydisperse': return threshold_type
@@ -109,22 +109,8 @@ class Test_Table(unittest.TestCase):
         table.add_calculation(calculation, 'Time format', column_name = "Time (s)", column_width = 0.33)
         table.add_calculation(calculation, 'Concentration format', column_name = "Concentration\n(counts/mL)", column_width = 0.3)
 
-        def get_sample_name(sample):
-            name = sample.name
-
-            # # Splits name into lines with letters_per_line letters each:
-            # letters_per_line = 12
-            # loops = 0
-            # for i in range(letters_per_line, len(name), letters_per_line):
-            #     before, after = name[:i+loops], name[i+loops:]
-            #     if before[-1] != ' ': before += '-'
-            #     name = before + '\n' + after
-            #     loops += 1
-            
-            return name
-        letters_per_line = 12
-        no_hyphens = True
-        table.add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format = get_sample_name, letters_per_line = letters_per_line, no_hyphens = no_hyphens)
+        sample_name, letters_per_line, no_hyphens = '{sample.name}', 12, True
+        table.add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format = sample_name, letters_per_line = letters_per_line, no_hyphens = no_hyphens)
             
 
     def get_num_columns(self):

@@ -68,7 +68,7 @@ class Table():
         if format is None:
             def format_function(*output_values):
                 assert len(output_values) == len(settings), f"Number of values given = {len(output_values)}; should be {len(settings)}"
-                return '\n'.join([setting.format(value) for setting, value in zip(settings, output_values)])
+                return '\n'.join([formatted for setting, value in zip(settings, output_values) if (formatted := setting.format(value)) != ''])
             format_function.__name__ = ''.join([setting.tag for setting in settings]) # For compatibility with hacky line "group_suffix = format.__name__" below
             format = format_function
         group_suffix = format.__name__ # TODO: replace with a less hacky solution

@@ -99,11 +99,12 @@ class Calculation():
         return settings_representation
 
 class Setting():
-    def __init__(self, tag, short_name = None, format = None, value_function = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
+    def __init__(self, tag, short_name = None, format = None, value_function = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True, exclude_None = True):
         if name is None: name = tag
         if short_name is None: short_name = name
         if format is None:
             def format_function(value):
+                if value is None and exclude_None: return ''
                 return show_name*f"{short_name}: " + str(value) + show_unit*f" ({units})"
             format = format_function
         if type(format) is str:
@@ -116,6 +117,7 @@ class Setting():
         self.column_number, self.column_name, self.column_width = column_number, column_name, column_width
         self.depends_on, self.dependencies_require = depends_on, dependencies_require
         self.hidden = hidden
+        self.exclude_None = exclude_None
 
         self.sample_values = dict()
         if sample_values is not None:
