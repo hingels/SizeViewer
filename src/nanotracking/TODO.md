@@ -1,6 +1,5 @@
 - Fix bugs:
   - Oddly scaled and placed axes on plot; they appear not wide enough
-  - Time since above isn't blank for the first row
   - Instead of (or in addition to) Calculation name, want to show format name in CSV files
 - Finish refresh functionality
 - Make all info.md settings user-defined, such that the user chooses the settings' names, how many there are, how they will be displayed, etc.

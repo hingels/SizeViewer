@@ -77,7 +77,7 @@ class NTA():
         height = min(np.floor(65536/resolution), height)
         self.figsize, self.colors, self.num_of_plots = (width, height), cm.plasma(np.linspace(0, 1, num_of_plots)), num_of_plots
         
-        self.overall_min, self.overall_max = None, None
+        self.counts_min, self.counts_max = None, None
         self.maxima, self.rejected_maxima = None, None
 
         self.tmp_filenames = {
@@ -239,7 +239,8 @@ class NTA():
             all_count_differences = []
         
         previous_sizes, previous_counts = None, None
-        overall_min, overall_max = 0, 0
+        sizes_min, sizes_max = 0, 0
+        counts_min, counts_max = 0, 0
         data_of_sample = self.data_of_sample
         for i, sample in enumerate(self.samples):
             if not refresh_data:
@@ -293,11 +294,13 @@ class NTA():
             if refresh_difference and previous_counts is not None:
                 count_differences = counts - previous_counts
                 all_count_differences.append(count_differences)
-                overall_max = max(count_differences.max(), overall_max)
-                overall_min = min(count_differences.min(), overall_min)
+                counts_max = max(count_differences.max(), counts_max)
+                counts_min = min(count_differences.min(), counts_min)
             if refresh_data or refresh_difference:
-                overall_max = max(counts.max(), overall_max)
-                overall_min = min(counts.min(), overall_min)
+                sizes_max = max((sizes+size_binwidth).iloc[-1], sizes_max)
+                sizes_min = min(sizes.iloc[0], sizes_min)
+                counts_max = max(counts.max(), counts_max)
+                counts_min = min(counts.min(), counts_min)
             for setting in tuple(need_refresh.settings):
                 value = setting.value_function(sample)
                 setting.set_value(sample, value)
@@ -311,7 +314,8 @@ class NTA():
         if refresh_data:
             np.save(tmp_filenames['sizes'], vstack(all_sizes))
             np.save(tmp_filenames['counts'], vstack(all_counts))
-            self.overall_min, self.overall_max = overall_min, overall_max
+            self.sizes_min, self.sizes_max = sizes_min, sizes_max
+            self.counts_min, self.counts_max = counts_min, counts_max
             self.size_binwidth = previous_sizes[1] - previous_sizes[0]
         # np.save(tmp_filenames['total_stds'], vstack(total_stds))
         # np.save(tmp_filenames['avg_histograms'], vstack(avg_histograms))
@@ -475,7 +479,8 @@ class NTA():
         return all_counts
     def plot(self, grid_color = '0.8', name = 'Ridgeline plot'):
         assert self.need_recompute == False, "Must run NTA.compute() first."
-        num_of_plots, samples, colors, table, peak_settings, overall_min, overall_max, output_folder = self.num_of_plots, self.samples, self.colors, self.table, self.peak_settings, self.overall_min, self.overall_max, self.output_folder
+        num_of_plots, samples, colors, table, peak_settings, output_folder = self.num_of_plots, self.samples, self.colors, self.table, self.peak_settings, self.output_folder
+        sizes_min, sizes_max, counts_min, counts_max = self.sizes_min, self.sizes_max, self.counts_min, self.counts_max
         peaks_enabled = (peak_settings is not None)
         table_enabled = self.table_enabled
         cumulative_enabled, difference_enabled = self.cumulative_enabled, self.difference_enabled
@@ -492,7 +497,7 @@ class NTA():
             cumulative_sums = np.load(tmp_filenames['cumulative_sums']+'.npy')
             cumsum_maxima = np.load(tmp_filenames['cumsum_maxima']+'.npy')
             max_of_cumulative_sums = cumsum_maxima.max()
-            cumulative_sum_scaling = overall_max / max_of_cumulative_sums
+            cumulative_sum_scaling = counts_max / max_of_cumulative_sums
         if difference_enabled:
             all_count_differences = np.load(tmp_filenames['count_differences']+'.npy')
 
@@ -538,8 +543,8 @@ class NTA():
             errorbars = np.array(list(zip(total_std, [0]*len(total_std)))).T
             plt.errorbar(bin_centers[:-1], avg_histogram, yerr = errorbars, elinewidth = 1, linestyle = '', marker = '.', ms = 1, alpha = 0.5, color = 'black')            
             
-            # plt.xlim(0, x_lim)
-            plt.ylim(overall_min, overall_max)
+            plt.xlim(sizes_min, sizes_max)
+            plt.ylim(counts_min, counts_max)
             ax.patch.set_alpha(0)
                 
             if i == final_i:
@@ -566,7 +571,7 @@ class NTA():
         final_i = len(tick_values) - 1
         right_edge_figure = None
         for i, tick_value in enumerate(tick_values):
-            display_coords = transData.transform([tick_value, overall_min])
+            display_coords = transData.transform([tick_value, counts_min])
             figure_x, figure_y = transFigure_inverted.transform(display_coords)
             
             line = plt.Line2D([figure_x, figure_x], [figure_y, grid_proportion_of_figure], lw = 1, color = grid_color, transform = transFigure, zorder = 0)
