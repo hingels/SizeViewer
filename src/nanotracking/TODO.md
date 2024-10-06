@@ -10,14 +10,13 @@
     - Use it for both calculations and groups of Setting objects
   - ~~Add a Plot class to more easily distinguish between plotting functionality and other features. Currently too many plot-related methods in NTA class; easy to get lost~~ **First, determine the role played by the NTA class. What is its purpose?**
   - Add a simple ViewSizer 3000 settings object (**or a simple dictionary**) that maps setting names and values from .xml to Setting objects
-  - Move enable/disable_peak_detection, enable/disable_cumulative, and enable/disable_difference into new `nanotracking.analysis`
+  - ~~Move~~ enable/disable_peak_detection, enable/disable_cumulative, and enable/disable_difference ~~into new `nanotracking.analysis`~~
     - Make these user-defined, too?
 - Validate concentration values displayed on the table. Are we using the correct volume in the calculation?
 - Save Calculation values in .npy files
 - Revisit the `particles` and `videos` attributes of Sample
 - **Transfer Colab demo into a Runme file to track in git**
   - Add file name templates to demo
-  - Add experimental unit in test_Table.py and demo
 - Add auto-refresh option
 - Plot improvements:
   - Clearly indicate that plots correspond to their adjacent rows in the table
