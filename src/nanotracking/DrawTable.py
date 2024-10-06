@@ -61,7 +61,9 @@ class Table():
         if len(settings) == 1:
             setting = settings[0]
             prepare_setting(setting)
-            if format is not None:
+            if format is None:
+                setting.set_attributes(format = format_apply_wordwrap(setting.format, letters_per_line, no_hyphens = no_hyphens))
+            else:
                 setting.set_attributes(format = format_apply_wordwrap(format, letters_per_line, no_hyphens = no_hyphens))
             self.add_setting(setting)
             return
@@ -81,17 +83,6 @@ class Table():
         new_column = calculation.representation_as_setting(format_name, self.nta_obj.samples)
         new_column.set_attributes(column_number = column_number, column_name = column_name, column_width = column_width)
         self.add_setting(new_column)
-    def add_experimental_unit(self, column_name = "Experimental\nunit", width = 0.3, column_number = None):
-        '''
-        Adds to the table a column for experimental unit, whose name is given by "experimental_unit=…" in each sample's info.md file.
-        '''
-        experimental_unit = self.nta_obj.settings.by_tag('experimental_unit')
-        if column_number is None:
-            column_number = len(self.columns_as_Settings_object.column_widths)
-        experimental_unit.column_number = column_number
-        experimental_unit.column_name = column_name
-        experimental_unit.column_width = width
-        self.add_setting(experimental_unit)
     def add_treatments_and_waits(self, treatments_column_name, treatments_width, waits_column_name, waits_width):
         '''
         For each treatment & wait-time listed in samples' info.md files, adds to the table

@@ -18,7 +18,7 @@ class Test_Table(unittest.TestCase):
         self.assertEqual(nta.num_of_plots, len(filenames), "Number of filenames is not equal to number of plots.")
         self.num_of_plots = nta.num_of_plots
         self.table_options = {
-            'width': 2.5,
+            'width': 2.7,
             'margin_minimum_right': 0.03,
             'margin_left': 0.2
         }
@@ -109,8 +109,11 @@ class Test_Table(unittest.TestCase):
         table.add_calculation(calculation, 'Time format', column_name = "Time (s)", column_width = 0.33)
         table.add_calculation(calculation, 'Concentration format', column_name = "Concentration\n(counts/mL)", column_width = 0.3)
 
-        sample_name, letters_per_line, no_hyphens = '{sample.name}', 12, True
-        table.add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format = sample_name, letters_per_line = letters_per_line, no_hyphens = no_hyphens)
+        def get_sample_name(sample):
+            return sample.name
+        letters_per_line, no_hyphens = 12, True
+        table.add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format = get_sample_name, letters_per_line = letters_per_line, no_hyphens = no_hyphens)
+        table.add_settings_by_tag('experimental_unit', column_name = "Experimental\nunit", column_width = 0.25, letters_per_line = letters_per_line, no_hyphens = no_hyphens)
             
 
     def get_num_columns(self):
