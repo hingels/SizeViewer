@@ -11,97 +11,125 @@ import typing
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from collections import OrderedDict
+import re
+
+def format_string_to_function(format_string, *output_names):
+    def format_function(*output_values):
+        outputs = dict(zip(output_names, output_values))
+        new_format_string = format_string
+        for placeholder in re.findall(r'\{(?!\{).*?\}', format_string):
+            no_braces = placeholder[1:-1]
+            assert no_braces in outputs, f'Placeholder "{no_braces}" was given in format string, but no corresponding output name was given.'
+            new_format_string = new_format_string.replace(placeholder, str(outputs[no_braces]))
+        return new_format_string
+    format_function.__name__ = str(int.from_bytes(format_string.encode(), 'little')) # For compatibility with the hacky line "group_suffix = format.__name__" in DrawTable.py
+    return format_function
+def format_apply_wordwrap(format_function, letters_per_line, no_hyphens = False):
+    if letters_per_line is None: return format_function
+    def new_format(*args):
+        text = format_function(*args)
+        if no_hyphens:
+            words = text.split()
+            new_text = [[]]
+            line_length = 0
+            for word in words:
+                word_length = len(word)
+                if line_length + word_length > letters_per_line:
+                    new_text.append([])
+                    line_length = 0
+                new_text[-1].append(word)
+                line_length += word_length
+            return '\n'.join((' '.join(line) for line in new_text))
+        loops = 0
+        for i in range(letters_per_line, len(text), letters_per_line):
+            before, after = text[:i+loops], text[i+loops:]
+            if before[-1] != ' ' and no_hyphens == False:
+                before += '-'
+            text = before + '\n' + after
+            loops += 1
+        return text
+    return new_format
 
 class Calculation():
-    def __init__(self, name, value_callback, *output_names, units = None, samples = None):
+    def __init__(self, name, value_function, *output_names, units = None, samples = None):
         '''
-        Defines a calculation with a name, a function determining its value (value_callback), and how to name the function's outputs (output_names).
-        The function value_callback takes a Sample object as its only argument.
+        Defines a calculation with a name, a function determining its value (value_function), and how to name the function's outputs (output_names).
+        The function value_function takes a Sample object as its only argument.
 
         Calculation.refresh() must be called immediately after a new Calculation is initialized.
         To skip this, use the keyword argument "samples" to specify which samples to use when refreshing.
         '''
-        self.name = name
-        self.value_callback = value_callback
-        
-        self.output_names = output_names
-        self.output_values = dict()
         if units is None: units = ''
-        self.units = units
-
-        self.formats = dict()
-
+        self.name, self.value_function = name, value_function
+        self.output_names, self.sample_output_values = output_names, dict()
+        self.units, self.formats = units, dict()
         if samples is not None:
             self.refresh(*samples)
-    def add_format(self, name, format_callback = None, format_string = None):
-        assert (format_callback is not None) or (format_string is not None), "Either format_callback or format_string must be specified."
-        assert (format_callback is None) or (format_string is None), "Cannot specify both format_callback and format_string."
-        if format_callback is not None:
-            self.formats[name] = format_callback
-            return
-        self.formats[name] = format_string
+    def add_format(self, name, format):
+        if type(format) is str:
+            format = format_string_to_function(format, *self.output_names)
+        self.formats[name] = format
     def apply_format(self, name, sample):
-        values = self.output_values[sample]
-        format_callback = self.formats[name]
-        # TODO: implement or remove format_string
-        return format_callback(*values)
+        output_values = self.sample_output_values[sample]
+        format = self.formats[name]
+        return format(*output_values)
     def refresh(self, *samples):
         '''
-        For each sample specified in samples, recalculates output values using Calculation.value_callback.
+        For each sample specified in samples, recalculates output values using Calculation.value_function.
         '''
         for sample in samples:
-            self.output_values[sample] = self.value_callback(sample)
+            output_values = self.value_function(sample)
+            try: iter(output_values)
+            except TypeError: output_values = [output_values]
+            self.sample_output_values[sample] = output_values
     def representation_as_setting(self, format_name, samples):
         '''
-        Returns a Setting object whose subsettings represent the outputs of Calculation.value_callback, including their numerical values.
+        Returns a Setting object whose subsettings represent the outputs of Calculation.value_function, including their numerical values.
         A new Setting object is created each time this runs!
         '''
-        output_values = self.output_values
+        sample_output_values = self.sample_output_values
         settings_representation = Setting(f'CALC_{self.name}_FORMAT_{format_name}')
         for i, output_name in enumerate(self.output_names):
             output = Setting(output_name, datatype = None)
             for sample in samples:
-                output.set_value(sample, output_values[sample][i])
-            settings_representation.add_subsetting(output, output_name)
-        # settings_representation.value_callback = self.value_callback
-        settings_representation.format_callback = self.formats[format_name]
+                output.set_value(sample, sample_output_values[sample][i])
+            settings_representation.add_subsetting(output_name, output)
+        # settings_representation.value_function = self.value_function
+        settings_representation.format = self.formats[format_name]
         return settings_representation
 
 class Setting():
-    def __init__(self, tag, short_name = None, format_string = None, format_callback = None, value_callback = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
-        self.tag = tag
+    def __init__(self, tag, short_name = None, format = None, value_function = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True, exclude_None = True):
         if name is None: name = tag
-        self.name = name
         if short_name is None: short_name = name
-        self.short_name = short_name
-        self.show_unit = show_unit
-        self.show_name = show_name
-        if format_string is None:
-            format_string = show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
-        self.format_string = format_string
-        self.format_callback = format_callback
-        self.value_callback = value_callback
-        self.units = units
-        self.column_number = column_number
-        self.column_name = column_name
-        self.column_width = column_width
+        if format is None:
+            def format_function(value):
+                if value is None and exclude_None: return ''
+                return show_name*f"{short_name}: " + str(value) + show_unit*f" ({units})"
+            format = format_function
+        if type(format) is str:
+            format = format_string_to_function(format, tag)
+        self.format = format
+        self.tag, self.short_name = tag, short_name
+        self.value_function, self.datatype = value_function, datatype
+        self.name, self.show_name = name, show_name
+        self.units, self.show_unit = units, show_unit
+        self.column_number, self.column_name, self.column_width = column_number, column_name, column_width
+        self.depends_on, self.dependencies_require = depends_on, dependencies_require
+        self.hidden = hidden
+        self.exclude_None = exclude_None
+
         self.sample_values = dict()
         if sample_values is not None:
             for sample, value in sample_values.items():
                 self.set_value(sample, value)
 
-        self.subsettings = OrderedDict()
-        self.numbered_subsettings = OrderedDict()
+        self.subsettings, self.numbered_subsettings = OrderedDict(), OrderedDict()
         if subsettings is not None:
             for subtag, subsetting in subsettings.items():
                 self.add_subsetting(subtag, subsetting)
         
-        self.datatype = datatype
-        self.depends_on = depends_on
-        self.dependencies_require = dependencies_require
-
-        self.hidden = hidden
-    def add_subsetting(self, subsetting, subtag):
+    def add_subsetting(self, subtag, subsetting):
         self.subsettings[subtag] = subsetting
         if type(subtag) is int:
             self.numbered_subsettings[subtag] = subsetting
@@ -140,12 +168,11 @@ class Setting():
             self.__setattr__(name, value)
 class Settings():
     def __init__(self, settings_dict = None):
+        self.tags, self.column_numbers, self.column_names = OrderedDict(), OrderedDict(), OrderedDict()
+        self.column_widths = []
         if settings_dict is None:
             settings_dict = OrderedDict()
-        self.tags = OrderedDict()
-        self.column_numbers = OrderedDict()
-        self.column_names = OrderedDict()
-        self.column_widths = []
+            return
         for tag, setting in settings_dict.items():
             self.add_setting(tag, setting)
     def by_tag(self, tag):
@@ -153,21 +180,16 @@ class Settings():
         if tag not in tags: return None
         return tags[tag]
     def add_setting(self, tag, setting):
-        tags = self.tags
+        tags, column_numbers, column_names = self.tags, self.column_numbers, self.column_names
         assert tag not in tags
         tags[tag] = setting
         
         self.column_widths.append(setting.column_width)
-        
-        column_numbers = self.column_numbers
-        column_number = setting.column_number
+        column_number, column_name = setting.column_number, setting.column_name
         if column_number is not None:
             if column_number not in column_numbers:
                 column_numbers[column_number] = []
             column_numbers[column_number].append(setting)
-        
-        column_names = self.column_names
-        column_name = setting.column_name
         if column_name is not None:
             if column_name not in column_names:
                 column_names[column_name] = []
@@ -186,27 +208,26 @@ class Settings():
                     setting.set_value(sample, None)
     def parse_time(self, sample):
         if 'MeasurementStartDateTime' not in self.tags: return
-        measurement_time = datetime.strptime(self.by_tag('MeasurementStartDateTime').get_value(sample), '%Y-%m-%d %H:%M:%S')
         if 'time' not in self.tags:
             time_setting = Setting('time', hidden = True)
             self.add_setting('time', time_setting)
+        measurement_time = datetime.strptime(self.by_tag('MeasurementStartDateTime').get_value(sample), '%Y-%m-%d %H:%M:%S')
         self.by_tag('time').set_value(sample, measurement_time, datatype = datetime)
         
         if 'experimental_unit' not in self.tags: return
         experimental_unit = self.by_tag('experimental_unit')
-        if hasattr(experimental_unit, 'date') is False: return
+        if not hasattr(experimental_unit, 'date'): return
         experimental_unit_date = datetime.strptime(experimental_unit.date.get_value(sample), '%Y/%m/%d')
         age = (measurement_time - experimental_unit_date).total_seconds() / 86400
         
-        if hasattr(experimental_unit, 'age') is False:
+        if not hasattr(experimental_unit, 'age'):
             age_subsetting = Setting('age', name = 'Age', units = 'days', datatype = float)
-            experimental_unit.add_subsetting(age_subsetting, 'age')
+            experimental_unit.add_subsetting('age', age_subsetting)
         experimental_unit.age.set_value(sample, age)
     def read_files(self, sample: Sample, dependencies: dict = None):
         if dependencies is None: dependencies = dict()
         tags = self.tags
-        by_tag = self.by_tag
-        add_setting = self.add_setting
+        by_tag, add_setting = self.by_tag, self.add_setting
         with open(sample.xml) as xml_file:
             tree = ET.parse(xml_file)
             root = tree.getroot()
@@ -243,19 +264,17 @@ class Settings():
                 if len(tag_split) == 1:        # If has no subvalues:
                     setting.set_value(sample, value)
                     continue
-                
                 assert len(tag_split) == 2
                 subtag = tag_split[1]
                 
-                units = ''
                 if subtag.isdigit():
                     assert float(subtag).is_integer()
                     subtag = int(subtag)
                     units = setting.units
-                
+                else: units = ''
                 if subtag not in setting.subsettings:
                     subsetting = Setting(full_tag, name = f"{setting.name}: {subtag}", units = units)
-                    setting.add_subsetting(subsetting, subtag)
+                    setting.add_subsetting(subtag, subsetting)
                 else:
                     subsetting = setting.subsettings[subtag]
                 
