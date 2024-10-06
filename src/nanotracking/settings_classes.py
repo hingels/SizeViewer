@@ -13,12 +13,15 @@ from datetime import datetime, timedelta
 from collections import OrderedDict
 import re
 
-def format_string_to_function(format_string):
-    def format_function(**outputs):
+def format_string_to_function(format_string, *output_names):
+    def format_function(*output_values):
+        outputs = dict(zip(output_names, output_values))
+        new_format_string = format_string
         for placeholder in re.findall(r'\{(?!\{).*?\}', format_string):
-            placeholder = placeholder[1:-1]
-            assert placeholder in outputs, f'Placeholder "{placeholder}" was given in format string, but no corresponding output name was given.'
-            format_string = format_string.format(placeholder = outputs[placeholder])
+            no_braces = placeholder[1:-1]
+            assert no_braces in outputs, f'Placeholder "{no_braces}" was given in format string, but no corresponding output name was given.'
+            new_format_string = new_format_string.replace(placeholder, str(outputs[no_braces]))
+        return new_format_string
     format_function.__name__ = str(int.from_bytes(format_string.encode(), 'little')) # For compatibility with the hacky line "group_suffix = format.__name__" in DrawTable.py
     return format_function
 
@@ -37,22 +40,23 @@ class Calculation():
         self.units, self.formats = units, dict()
         if samples is not None:
             self.refresh(*samples)
-    # def get_outputs(self, sample):
-    #     return {output_name: output_values[sample] for output_name, output_values in self.outputs.items()}
     def add_format(self, name, format):
         if type(format) is str:
-            format = format_string_to_function(format)
+            format = format_string_to_function(format, *self.output_names)
         self.formats[name] = format
     def apply_format(self, name, sample):
-        output_names, output_values = self.output_names, self.sample_output_values[sample]
+        output_values = self.sample_output_values[sample]
         format = self.formats[name]
-        return format(*dict(output_names, output_values))
+        return format(*output_values)
     def refresh(self, *samples):
         '''
         For each sample specified in samples, recalculates output values using Calculation.value_function.
         '''
         for sample in samples:
-            self.sample_output_values[sample] = self.value_function(sample)
+            output_values = self.value_function(sample)
+            try: iter(output_values)
+            except TypeError: output_values = [output_values]
+            self.sample_output_values[sample] = output_values
     def representation_as_setting(self, format_name, samples):
         '''
         Returns a Setting object whose subsettings represent the outputs of Calculation.value_function, including their numerical values.
@@ -74,15 +78,11 @@ class Setting():
         if name is None: name = tag
         if short_name is None: short_name = name
         if format is None:
-            def format_function(**kwargs):
-                assert len(kwargs) == 1, f"Too many keyword arguments given to the format function of Setting with tag {tag}; should only have one."
-                input_tag, = tuple(kwargs)
-                assert input_tag == tag, f"Wrong Setting's tag {input_tag} was used when calling the format function of Setting with tag {tag}."
-                # assert tag in kwargs, f"Tag {tag} was not given to format function of Setting with tag {tag}."
-                return show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
+            def format_function(value):
+                return show_name*f"{short_name}: " + str(value) + show_unit*f" ({units})"
             format = format_function
         if type(format) is str:
-            format = format_string_to_function(format)
+            format = format_string_to_function(format, tag)
         self.format = format
         self.tag, self.short_name = tag, short_name
         self.value_function, self.datatype = value_function, datatype

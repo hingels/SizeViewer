@@ -417,14 +417,14 @@ class NTA():
                     if column[0].tag.startswith('COLUMN'):
                         group = column[0]
                         grouped_settings = group.subsettings.values()
-                        row.append(group.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
+                        row.append(group.format(*(setting.get_value(sample) for setting in grouped_settings)))
                     elif column[0].tag.startswith('CALC'):
                         group = column[0]
                         grouped_settings = group.subsettings.values()
-                        row.append(group.format(**{subsetting.tag: subsetting.get_value(sample) for subsetting in grouped_settings}))
+                        row.append(group.format(*(subsetting.get_value(sample) for subsetting in grouped_settings)))
                     else:
                         setting = column[0]
-                        row.append(setting.format(**{setting.tag: setting.get_value(sample)}))
+                        row.append(setting.format(setting.get_value(sample)))
                 
                 row.append("")
                 yield row

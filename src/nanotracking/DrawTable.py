@@ -54,7 +54,7 @@ class Table():
         get_setting_or_calculation = self.nta_obj.get_setting_or_calculation
         settings = [get_setting_or_calculation(tag) for tag in tags]
         if type(format) is str:
-            format = format_string_to_function(format)
+            format = format_string_to_function(format, *tags)
         if len(settings) == 1:
             setting = settings[0]
             prepare_setting(setting)
@@ -63,8 +63,9 @@ class Table():
             self.add_setting(setting)
             return
         if format is None:
-            def format_function(**outputs):
-                return '\n'.join([setting.format(**outputs) for setting in settings])
+            def format_function(*output_values):
+                assert len(output_values) == len(settings), f"Number of values given = {len(output_values)}; should be {len(settings)}"
+                return '\n'.join([setting.format(value) for setting, value in zip(settings, output_values)])
             format_function.__name__ = ''.join([setting.tag for setting in settings]) # For compatibility with hacky line "group_suffix = format.__name__" below
             format = format_function
         group_suffix = format.__name__ # TODO: replace with a less hacky solution

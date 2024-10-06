@@ -44,10 +44,7 @@ class Test_Table(unittest.TestCase):
             return f"{video_duration}x{num_of_videos}"
         table.add_settings_by_tag('FrameRate', 'FramesPerVideo', 'NumOfVideos', column_name = "Video sec\nx quantity", column_width = 0.16, format = get_video_info)
 
-        # def get_stir_info(stir_time, stir_rpm):
-        #     return f"{stir_time}x{stir_rpm}"
-        # table.add_settings_by_tag('StirredTime', 'StirrerSpeed', column_name = "Stir sec\nx RPM", column_width = 0.12, format = get_stir_info)
-        stir_format = '{stir_time}x{stir_rpm}'
+        stir_format = '{StirredTime}x{StirrerSpeed}'
         table.add_settings_by_tag('StirredTime', 'StirrerSpeed', column_name = "Stir sec\nx RPM", column_width = 0.12, format = stir_format)
         
         def get_ID_info(ID):
@@ -108,9 +105,6 @@ class Test_Table(unittest.TestCase):
             return '\n'.join(text)
         calculation.add_format('Time format', get_time_info)
 
-        # def get_conc_info(previous, time_since_previous, time_since_above, total_conc, total_conc_under_topnm, top_nm):
-        #     return f"Total: {total_conc}\n<{top_nm}nm: {total_conc_under_topnm}"
-        # calculation.add_format('Concentration format', get_conc_info)
         calculation.add_format('Concentration format', 'Total: {total_conc}\n<{top_nm}nm: {total_conc_under_topnm}')
         
         table.add_calculation(calculation, 'Time format', column_name = "Time (s)", column_width = 0.33)
