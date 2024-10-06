@@ -11,6 +11,16 @@ import typing
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from collections import OrderedDict
+import re
+
+def format_string_to_function(format_string):
+    def format_function(**outputs):
+        for placeholder in re.findall(r'\{(?!\{).*?\}', format_string):
+            placeholder = placeholder[1:-1]
+            assert placeholder in outputs, f'Placeholder "{placeholder}" was given in format string, but no corresponding output name was given.'
+            format_string = format_string.format(placeholder = outputs[placeholder])
+    format_function.__name__ = str(int.from_bytes(format_string.encode(), 'little')) # For compatibility with the hacky line "group_suffix = format.__name__" in DrawTable.py
+    return format_function
 
 class Calculation():
     def __init__(self, name, value_function, *output_names, units = None, samples = None):
@@ -23,52 +33,58 @@ class Calculation():
         '''
         if units is None: units = ''
         self.name, self.value_function = name, value_function
-        self.output_names, self.output_values = output_names, dict()
+        self.output_names, self.sample_output_values = output_names, dict()
         self.units, self.formats = units, dict()
         if samples is not None:
             self.refresh(*samples)
-    def add_format(self, name, format_function = None, format_string = None):
-        assert (format_function is not None) or (format_string is not None), "Either format_function or format_string must be specified."
-        assert (format_function is None) or (format_string is None), "Cannot specify both format_function and format_string."
-        if format_function is not None:
-            self.formats[name] = format_function
-            return
-        self.formats[name] = format_string
+    # def get_outputs(self, sample):
+    #     return {output_name: output_values[sample] for output_name, output_values in self.outputs.items()}
+    def add_format(self, name, format):
+        if type(format) is str:
+            format = format_string_to_function(format)
+        self.formats[name] = format
     def apply_format(self, name, sample):
-        values = self.output_values[sample]
-        format_function = self.formats[name]
-        # TODO: implement or remove format_string
-        return format_function(*values)
+        output_names, output_values = self.output_names, self.sample_output_values[sample]
+        format = self.formats[name]
+        return format(*dict(output_names, output_values))
     def refresh(self, *samples):
         '''
         For each sample specified in samples, recalculates output values using Calculation.value_function.
         '''
         for sample in samples:
-            self.output_values[sample] = self.value_function(sample)
+            self.sample_output_values[sample] = self.value_function(sample)
     def representation_as_setting(self, format_name, samples):
         '''
         Returns a Setting object whose subsettings represent the outputs of Calculation.value_function, including their numerical values.
         A new Setting object is created each time this runs!
         '''
-        output_values = self.output_values
+        sample_output_values = self.sample_output_values
         settings_representation = Setting(f'CALC_{self.name}_FORMAT_{format_name}')
         for i, output_name in enumerate(self.output_names):
             output = Setting(output_name, datatype = None)
             for sample in samples:
-                output.set_value(sample, output_values[sample][i])
+                output.set_value(sample, sample_output_values[sample][i])
             settings_representation.add_subsetting(output_name, output)
         # settings_representation.value_function = self.value_function
-        settings_representation.format_function = self.formats[format_name]
+        settings_representation.format = self.formats[format_name]
         return settings_representation
 
 class Setting():
-    def __init__(self, tag, short_name = None, format_string = None, format_function = None, value_function = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
+    def __init__(self, tag, short_name = None, format = None, value_function = None, name = None, units = '', column_number = None, column_name = None, column_width = None, sample_values: dict = None, show_unit = False, show_name = False, datatype = str, depends_on = None, subsettings = None, hidden = False, dependencies_require = True):
         if name is None: name = tag
         if short_name is None: short_name = name
-        if format_string is None:
-            format_string = show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
+        if format is None:
+            def format_function(**kwargs):
+                assert len(kwargs) == 1, f"Too many keyword arguments given to the format function of Setting with tag {tag}; should only have one."
+                input_tag, = tuple(kwargs)
+                assert input_tag == tag, f"Wrong Setting's tag {input_tag} was used when calling the format function of Setting with tag {tag}."
+                # assert tag in kwargs, f"Tag {tag} was not given to format function of Setting with tag {tag}."
+                return show_name*f"{short_name}: " + f"{{{tag}}}" + show_unit*f" ({units})"
+            format = format_function
+        if type(format) is str:
+            format = format_string_to_function(format)
+        self.format = format
         self.tag, self.short_name = tag, short_name
-        self.format_string, self.format_function = format_string, format_function
         self.value_function, self.datatype = value_function, datatype
         self.name, self.show_name = name, show_name
         self.units, self.show_unit = units, show_unit

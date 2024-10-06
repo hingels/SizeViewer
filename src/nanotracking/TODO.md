@@ -2,13 +2,10 @@
   - Oddly scaled and placed axes on plot; they appear not wide enough
   - Time since above isn't blank for the first row
   - Instead of (or in addition to) Calculation name, want to show format name in CSV files
-  - Test format strings to make sure they work, or remove them
+  - ~~Test format strings to make sure they work, or remove them~~ Replace code specific to format strings with a simple "format callback maker," e.g. `format_callback = lambda *args: format_string.format(…………)`
 - Finish refresh functionality
 - Make all info.md settings user-defined, such that the user chooses the settings' names, how many there are, how they will be displayed, etc.
 - Housekeeping
-  - Make docs folder
-    - Make diagram(s) of the codebase, laying out how data structures are handled, operated on, etc.
-      - Add diagram-as-code to the repo
   - Add assertion that each column_number corresponds to exactly one Setting object (which may have subsettings to include multiple rows of information)
   - Add assertion that Setting tag has no spaces in Setting.__init__()
     - Is this necessary?
@@ -19,7 +16,6 @@
   - Move enable/disable_peak_detection, enable/disable_cumulative, and enable/disable_difference into new `nanotracking.analysis`
     - Make these user-defined, too?
 - Validate concentration values displayed on the table. Are we using the correct volume in the calculation?
-- Replace code specific to format strings with a simple "format callback maker," e.g. `format_callback = lambda *args: format_string.format(…………)`
 - Save Calculation values in .npy files
 - Revisit the `particles` and `videos` attributes of Sample
 - **Transfer Colab demo into a Runme file to track in git**

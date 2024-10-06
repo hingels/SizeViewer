@@ -417,25 +417,14 @@ class NTA():
                     if column[0].tag.startswith('COLUMN'):
                         group = column[0]
                         grouped_settings = group.subsettings.values()
-                        if group.format_function is not None:
-                            row.append(group.format_function(*(setting.get_value(sample) for setting in grouped_settings)))
-                            continue
-                        row.append(group.format_string.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
+                        row.append(group.format(**{setting.tag: setting.get_value(sample) for setting in grouped_settings}))
                     elif column[0].tag.startswith('CALC'):
                         group = column[0]
                         grouped_settings = group.subsettings.values()
-                        values = [subsetting.get_value(sample) for subsetting in grouped_settings]
-                        if group.format_function is not None:
-                            row.append(group.format_function(*values))
-                            continue
-                        row.append(group.format_string.format(**{setting.tag: value for setting, value in zip(grouped_settings, values)}))
+                        row.append(group.format(**{subsetting.tag: subsetting.get_value(sample) for subsetting in grouped_settings}))
                     else:
                         setting = column[0]
-                        value = setting.get_value(sample)
-                        if setting.format_function is None:
-                            row.append(setting.format_string.format(**{setting.tag: value}))
-                        else:
-                            row.append(setting.format_function(value))
+                        row.append(setting.format(**{setting.tag: setting.get_value(sample)}))
                 
                 row.append("")
                 yield row
