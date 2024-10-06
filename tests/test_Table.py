@@ -110,8 +110,21 @@ class Test_Table(unittest.TestCase):
         table.add_calculation(calculation, 'Concentration format', column_name = "Concentration\n(counts/mL)", column_width = 0.3)
 
         def get_sample_name(sample):
-            return sample.name
-        table.add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format = get_sample_name)
+            name = sample.name
+
+            # # Splits name into lines with letters_per_line letters each:
+            # letters_per_line = 12
+            # loops = 0
+            # for i in range(letters_per_line, len(name), letters_per_line):
+            #     before, after = name[:i+loops], name[i+loops:]
+            #     if before[-1] != ' ': before += '-'
+            #     name = before + '\n' + after
+            #     loops += 1
+            
+            return name
+        letters_per_line = 12
+        no_hyphens = True
+        table.add_settings_by_tag('sample', column_name = "Sample name", column_width = 0.25, format = get_sample_name, letters_per_line = letters_per_line, no_hyphens = no_hyphens)
             
 
     def get_num_columns(self):

@@ -1,6 +1,6 @@
 import matplotlib as mpl
 from copy import deepcopy
-from .settings_classes import Setting, Settings, format_string_to_function
+from .settings_classes import Setting, Settings, format_string_to_function, format_apply_wordwrap
 
 
 class Table():
@@ -32,7 +32,7 @@ class Table():
         if setting.column_number is None:
             setting.column_number = len(settings.column_widths)
         settings.add_setting(setting.tag, setting)
-    def add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format = None):
+    def add_settings_by_tag(self, *tags, column_number = None, column_name = None, column_width = None, format = None, letters_per_line = None, no_hyphens = False):
         '''
         Adds multiple Setting objects to the table.
         Example use case: specify column_number to group all specified settings into one column.
@@ -44,6 +44,9 @@ class Table():
         1. As a format string, which should reference settings' values using their tags in curly braces. For example, format = "Red has power {RedLaserPower}."
         2. As a function, which should accept settings' values as arguments and return a string.
         If format is not given, then for each cell in the column, the settings' individual formats will be used on separate lines.
+
+        If letters_per_line is specified, text will be split into lines with letters_per_line characters each.
+        If additionally no_hyphens is True, hyphens will not be used for word wrap; instead, words will be grouped such that each line does not exceed letters_per_line characters.
         '''
         if column_number is None:
             column_number = len(self.columns_as_Settings_object.column_widths)
@@ -59,7 +62,7 @@ class Table():
             setting = settings[0]
             prepare_setting(setting)
             if format is not None:
-                setting.set_attributes(format = format)
+                setting.set_attributes(format = format_apply_wordwrap(format, letters_per_line, no_hyphens = no_hyphens))
             self.add_setting(setting)
             return
         if format is None:
@@ -69,7 +72,7 @@ class Table():
             format_function.__name__ = ''.join([setting.tag for setting in settings]) # For compatibility with hacky line "group_suffix = format.__name__" below
             format = format_function
         group_suffix = format.__name__ # TODO: replace with a less hacky solution
-        group = Setting('COLUMN_' + '_'.join(tags) + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format = format)
+        group = Setting('COLUMN_' + '_'.join(tags) + group_suffix, column_number = column_number, column_name = column_name, column_width = column_width, format = format_apply_wordwrap(format, letters_per_line, no_hyphens = no_hyphens))
         for setting in settings:
             prepare_setting(setting)
             group.add_subsetting(setting.tag, setting)

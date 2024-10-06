@@ -24,6 +24,31 @@ def format_string_to_function(format_string, *output_names):
         return new_format_string
     format_function.__name__ = str(int.from_bytes(format_string.encode(), 'little')) # For compatibility with the hacky line "group_suffix = format.__name__" in DrawTable.py
     return format_function
+def format_apply_wordwrap(format_function, letters_per_line, no_hyphens = False):
+    if letters_per_line is None: return format_function
+    def new_format(*args):
+        text = format_function(*args)
+        if no_hyphens:
+            words = text.split()
+            new_text = [[]]
+            line_length = 0
+            for word in words:
+                word_length = len(word)
+                if line_length + word_length > letters_per_line:
+                    new_text.append([])
+                    line_length = 0
+                new_text[-1].append(word)
+                line_length += word_length
+            return '\n'.join((' '.join(line) for line in new_text))
+        loops = 0
+        for i in range(letters_per_line, len(text), letters_per_line):
+            before, after = text[:i+loops], text[i+loops:]
+            if before[-1] != ' ' and no_hyphens == False:
+                before += '-'
+            text = before + '\n' + after
+            loops += 1
+        return text
+    return new_format
 
 class Calculation():
     def __init__(self, name, value_function, *output_names, units = None, samples = None):
