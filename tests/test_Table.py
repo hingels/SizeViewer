@@ -85,8 +85,7 @@ class Test_Table(unittest.TestCase):
                     previous_sample = unordered_samples[previous]
                     time_of_previous = settings.by_tag('time').get_value(previous_sample)
                     time_since_previous = int((time - time_of_previous).total_seconds())
-            try: above = samples[sample_index - 1]
-            except: above = None
+            above = samples[sample_index - 1] if sample_index != 0 else None
             time_since_above = None
             if above is not None:
                 time_of_above = times.get_value(above)
